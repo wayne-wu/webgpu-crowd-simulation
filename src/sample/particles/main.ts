@@ -458,9 +458,9 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
 
 const Particles: () => JSX.Element = () =>
   makeSample({
-    name: 'Particles',
+    name: 'Crowd Simulation',
     description:
-      'This example demonstrates rendering of particles simulated with compute shaders.',
+      'This example demonstrates crowd simulation with compute shaders.',
     gui: true,
     init,
     sources: [

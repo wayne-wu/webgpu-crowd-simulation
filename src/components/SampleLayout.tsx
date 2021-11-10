@@ -204,37 +204,7 @@ const SampleLayout: React.FunctionComponent<
           }}
           ref={guiParentRef}
         ></div>
-        <canvas ref={canvasRef} width={600} height={600}></canvas>
-      </div>
-      <div>
-        <nav className={styles.sourceFileNav}>
-          <ul>
-            {sources.map((src, i) => {
-              return (
-                <li key={i}>
-                  <a
-                    href={`#${src.name}`}
-                    data-active={activeHash == src.name}
-                    onClick={() => {
-                      setActiveHash(src.name);
-                    }}
-                  >
-                    {src.name}
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-        {sources.map((src, i) => {
-          return (
-            <src.Container
-              className={styles.sourceFileContainer}
-              data-active={activeHash == src.name}
-              key={i}
-            />
-          );
-        })}
+        <canvas ref={canvasRef} width={1000} height={1000}></canvas>
       </div>
     </main>
   );

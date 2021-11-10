@@ -69,7 +69,7 @@ const MainLayout: React.FunctionComponent<AppProps> = ({
         />
       </Head>
       <div className={styles.wrapper}>
-        <nav className={`${styles.panel} ${styles.container}`}>
+        {/* <nav className={`${styles.panel} ${styles.container}`}>
           <h1>
             <Link href="/">{title}</Link>
           </h1>
@@ -88,7 +88,7 @@ const MainLayout: React.FunctionComponent<AppProps> = ({
               );
             })}
           </ul>
-        </nav>
+        </nav> */}
         <Component {...pageProps} />
       </div>
     </>
