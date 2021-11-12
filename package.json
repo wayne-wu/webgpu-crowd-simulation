@@ -1,7 +1,7 @@
 {
   "name": "webgpu-crowd-simulation",
   "version": "0.1.0",
-  "description": "Samples using the Web GPU API",
+  "description": "WebGPU crowd simulation",
   "license": "BSD-3-Clause",
   "private": false,
   "repository": {
