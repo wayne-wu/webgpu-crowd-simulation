@@ -1,5 +1,6 @@
 import styles from './HomePage.module.css';
-import Particles from './samples/particles'
+import Particles from './samples/particles';
+import Scene from './samples/scene';
 
 // const HomePage: React.FunctionComponent = () => {
 //   return (
@@ -26,4 +27,4 @@ import Particles from './samples/particles'
 //   );
 // };
 
-export default Particles;
+export default Scene;
