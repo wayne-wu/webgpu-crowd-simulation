@@ -1,5 +1,6 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { makeSample, SampleInit } from '../../components/SampleLayout';
+import Camera from "./Camera";
 
 import {
   platformVertexArray,
@@ -13,6 +14,14 @@ import basicVertWGSL from '../../shaders/basic.vert.wgsl';
 import vertexPositionColorWGSL from '../../shaders/vertexPositionColor.frag.wgsl';
 
 const init: SampleInit = async ({ canvasRef }) => {
+
+  // create camera
+  const camera = new Camera(vec3.fromValues(0, 2, 5), vec3.fromValues(0, 0, 0));
+
+  const aspect = canvasRef.current.width / canvasRef.current.height;
+  camera.setAspectRatio(aspect);
+  camera.updateProjectionMatrix();
+
   const adapter = await navigator.gpu.requestAdapter();
   const device = await adapter.requestDevice();
 
@@ -125,7 +134,7 @@ const init: SampleInit = async ({ canvasRef }) => {
       {
         view: undefined, // Assigned later
 
-        loadValue: { r: 0.5, g: 0.5, b: 0.5, a: 1.0 },
+        loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         storeOp: 'store',
       },
     ],
@@ -139,24 +148,15 @@ const init: SampleInit = async ({ canvasRef }) => {
     },
   };
 
-  const aspect = canvasRef.current.width / canvasRef.current.height;
-  const projectionMatrix = mat4.create();
-  mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, aspect, 1, 100.0);
-
   function getTransformationMatrix() {
-    const viewMatrix = mat4.create();
-    mat4.translate(viewMatrix, viewMatrix, vec3.fromValues(0, 0, -4));
-    const now = Date.now() / 1000;
-    mat4.rotate(
-      viewMatrix,
-      viewMatrix,
-      1,
-      vec3.fromValues(Math.sin(now), Math.cos(now), 0)
-    );
+    const modelMatrix = mat4.create();
+    mat4.identity(modelMatrix);
+    mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(2, 0.1, 2));
 
+    //return modelViewProjectionMatrix as Float32Array;
     const modelViewProjectionMatrix = mat4.create();
-    mat4.multiply(modelViewProjectionMatrix, projectionMatrix, viewMatrix);
-
+    mat4.multiply(modelViewProjectionMatrix, camera.viewMatrix, modelMatrix);
+    mat4.multiply(modelViewProjectionMatrix, camera.projectionMatrix, modelViewProjectionMatrix);
     return modelViewProjectionMatrix as Float32Array;
   }
 
@@ -164,6 +164,7 @@ const init: SampleInit = async ({ canvasRef }) => {
     // Sample is no longer the active page.
     if (!canvasRef.current) return;
 
+    camera.update();
     const transformationMatrix = getTransformationMatrix();
     device.queue.writeBuffer(
       uniformBuffer,

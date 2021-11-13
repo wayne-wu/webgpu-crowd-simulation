@@ -16,6 +16,7 @@
     "export": "next export"
   },
   "dependencies": {
+    "3d-view-controls": "^2.2.2",
     "codemirror": "^5.58.2",
     "dat.gui": "^0.7.6",
     "file-loader": "^6.2.0",
