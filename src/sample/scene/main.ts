@@ -28,10 +28,19 @@ import {
 
 import renderWGSL from './shaders.wgsl';
 
-const init: SampleInit = async ({ canvasRef }) => {
+const init: SampleInit = async ({ canvasRef, gui }) => {
 
   // create camera
   const camera = new Camera(vec3.fromValues(0, 2, 5), vec3.fromValues(0, 0, 0));
+
+  const gridParams = {
+    gridWidth: 5
+  };
+
+  let prevGridWidth = 5;
+  Object.keys(gridParams).forEach((k) => {
+    gui.add(gridParams, k, 1, 100, 1);
+  });
 
   const aspect = canvasRef.current.width / canvasRef.current.height;
   camera.setAspectRatio(aspect);
@@ -59,8 +68,8 @@ const init: SampleInit = async ({ canvasRef }) => {
   // Create vertex buffers for the platform and the grid lines
   const verticesBufferPlatform = getVerticesBuffer(device, platformVertexArray);
   // Compute the grid lines based on an input gridWidth
-  const gridLinesVertexArray = getGridLines(4);
-  const verticesBufferGridLines = getVerticesBuffer(device, gridLinesVertexArray);
+  let gridLinesVertexArray = getGridLines(gridParams.gridWidth);
+  let verticesBufferGridLines = getVerticesBuffer(device, gridLinesVertexArray);
 
   // Create render pipelines for platform and grid lines
   const pipelinePlatform = getPipeline(
@@ -116,6 +125,12 @@ const init: SampleInit = async ({ canvasRef }) => {
     // Sample is no longer the active page.
     if (!canvasRef.current) return;
 
+    if (prevGridWidth != gridParams.gridWidth) {
+      gridLinesVertexArray = getGridLines(gridParams.gridWidth);
+      verticesBufferGridLines = getVerticesBuffer(device, gridLinesVertexArray);
+      prevGridWidth = gridParams.gridWidth;
+    }
+
     camera.update();
     const transformationMatrix = getTransformationMatrix();
     device.queue.writeBuffer(
@@ -162,6 +177,7 @@ const Scene: () => JSX.Element = () =>
     description:
       'This is the default scene minus the crowd elements.',
     init,
+    gui: true,
     sources: [
       {
         name: __filename.substr(__dirname.length + 1),
