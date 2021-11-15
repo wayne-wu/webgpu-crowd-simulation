@@ -27,22 +27,36 @@ import {
 } from './renderUtils';
 
 import renderWGSL from './shaders.wgsl';
+import { getuid } from 'process';
+
+let camera : Camera;
+let aspect : number;
+
+function resetCameraFunc() {
+  camera = new Camera(vec3.fromValues(0, 2, 5), vec3.fromValues(0, 0, 0));
+  camera.setAspectRatio(aspect);
+  camera.updateProjectionMatrix();
+}
 
 const init: SampleInit = async ({ canvasRef, gui }) => {
 
   // create camera
-  const camera = new Camera(vec3.fromValues(0, 2, 5), vec3.fromValues(0, 0, 0));
+  camera = new Camera(vec3.fromValues(0, 2, 5), vec3.fromValues(0, 0, 0));
 
-  const gridParams = {
-    gridWidth: 5
+  const guiParams = {
+    gridWidth: 5,
+    resetCamera: resetCameraFunc
   };
 
   let prevGridWidth = 5;
-  Object.keys(gridParams).forEach((k) => {
-    gui.add(gridParams, k, 1, 100, 1);
-  });
+  gui.addFolder("Grid");
+  gui.add(guiParams, 'gridWidth', 1, 100, 1);
+  gui.open();
+  gui.addFolder("Camera");
+  gui.add(guiParams, 'resetCamera');
+  gui.open();
 
-  const aspect = canvasRef.current.width / canvasRef.current.height;
+  aspect = canvasRef.current.width / canvasRef.current.height;
   camera.setAspectRatio(aspect);
   camera.updateProjectionMatrix();
 
@@ -68,7 +82,7 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
   // Create vertex buffers for the platform and the grid lines
   const verticesBufferPlatform = getVerticesBuffer(device, platformVertexArray);
   // Compute the grid lines based on an input gridWidth
-  let gridLinesVertexArray = getGridLines(gridParams.gridWidth);
+  let gridLinesVertexArray = getGridLines(guiParams.gridWidth);
   let verticesBufferGridLines = getVerticesBuffer(device, gridLinesVertexArray);
 
   // Create render pipelines for platform and grid lines
@@ -125,10 +139,10 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
     // Sample is no longer the active page.
     if (!canvasRef.current) return;
 
-    if (prevGridWidth != gridParams.gridWidth) {
-      gridLinesVertexArray = getGridLines(gridParams.gridWidth);
+    if (prevGridWidth != guiParams.gridWidth) {
+      gridLinesVertexArray = getGridLines(guiParams.gridWidth);
       verticesBufferGridLines = getVerticesBuffer(device, gridLinesVertexArray);
-      prevGridWidth = gridParams.gridWidth;
+      prevGridWidth = guiParams.gridWidth;
     }
 
     camera.update();
