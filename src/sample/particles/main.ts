@@ -1,13 +1,13 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { makeSample, SampleInit } from '../../components/SampleLayout';
 
-import particleWGSL from './particle.wgsl';
+import crowdWGSL from './crowd.wgsl';
 import probabilityMapWGSL from './probabilityMap.wgsl';
 
-const numParticles = 1000000;
-const particlePositionOffset = 0;
-const particleColorOffset = 4 * 4;
-const particleInstanceByteSize =
+const numAgents = 100000;
+const agentPositionOffset = 0;
+const agentColorOffset = 4 * 4;
+const agentInstanceByteSize =
   3 * 4 + // position
   1 * 4 + // lifetime
   4 * 4 + // color
@@ -35,33 +35,77 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
     size: presentationSize,
   });
 
-  const particlesBuffer = device.createBuffer({
-    size: numParticles * particleInstanceByteSize,
+  const agentsBuffer = device.createBuffer({
+    size: numAgents * agentInstanceByteSize,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+    mappedAtCreation: true
   });
+
+  const agentIdxOffset = 12;
+  const initialAgentData = new Float32Array(numAgents * agentIdxOffset);  //48 is total byte size of each agent
+
+  for (let i = 0; i < numAgents/2; ++i) {
+    // position.xyz
+    initialAgentData[agentIdxOffset * i + 0] = 10 * (Math.random() - 0.5);
+    initialAgentData[agentIdxOffset * i + 1] = 0;
+    initialAgentData[agentIdxOffset * i + 2] = 10 + 2 * (Math.random() - 0.5);
+
+    // color.rgba
+    initialAgentData[agentIdxOffset * i + 4] = 1;
+    initialAgentData[agentIdxOffset * i + 5] = 0;
+    initialAgentData[agentIdxOffset * i + 6] = 0;
+    initialAgentData[agentIdxOffset * i + 7] = 1;
+
+    // velocity.xyz
+    initialAgentData[agentIdxOffset * i + 8] = 0;
+    initialAgentData[agentIdxOffset * i + 9] = 0;
+    initialAgentData[agentIdxOffset * i + 10] = (0.1 + 0.5 * Math.random())*-1;
+  }
+  for (let i = numAgents/2; i < numAgents; ++i) {
+    // position.xyz
+    initialAgentData[agentIdxOffset * i + 0] = 10 * (Math.random() - 0.5);
+    initialAgentData[agentIdxOffset * i + 1] = 0;
+    initialAgentData[agentIdxOffset * i + 2] = -10 + 2 * (Math.random() - 0.5);
+
+    // color.rgba
+    initialAgentData[agentIdxOffset * i + 4] = 0;
+    initialAgentData[agentIdxOffset * i + 5] = 0;
+    initialAgentData[agentIdxOffset * i + 6] = 1;
+    initialAgentData[agentIdxOffset * i + 7] = 1;
+
+    // velocity.xyz
+    initialAgentData[agentIdxOffset * i + 8] = 0;
+    initialAgentData[agentIdxOffset * i + 9] = 0;
+    initialAgentData[agentIdxOffset * i + 10] = (0.1 + 0.5 * Math.random());
+  }
+
+  new Float32Array(agentsBuffer.getMappedRange()).set(
+    initialAgentData
+  );
+  agentsBuffer.unmap();
 
   const renderPipeline = device.createRenderPipeline({
     vertex: {
       module: device.createShaderModule({
-        code: particleWGSL,
+        code: crowdWGSL,
       }),
       entryPoint: 'vs_main',
       buffers: [
         {
-          // instanced particles buffer
-          arrayStride: particleInstanceByteSize,
+          // instanced agents buffer
+          arrayStride: agentInstanceByteSize,
           stepMode: 'instance',
           attributes: [
             {
               // position
               shaderLocation: 0,
-              offset: particlePositionOffset,
+              offset: agentPositionOffset,
               format: 'float32x3',
             },
             {
               // color
               shaderLocation: 1,
-              offset: particleColorOffset,
+              offset: agentColorOffset,
               format: 'float32x4',
             },
           ],
@@ -83,7 +127,7 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
     },
     fragment: {
       module: device.createShaderModule({
-        code: particleWGSL,
+        code: crowdWGSL,
       }),
       entryPoint: 'fs_main',
       targets: [
@@ -349,7 +393,7 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
   const computePipeline = device.createComputePipeline({
     compute: {
       module: device.createShaderModule({
-        code: particleWGSL,
+        code: crowdWGSL,
       }),
       entryPoint: 'simulate',
     },
@@ -366,14 +410,10 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
       {
         binding: 1,
         resource: {
-          buffer: particlesBuffer,
+          buffer: agentsBuffer,
           offset: 0,
-          size: numParticles * particleInstanceByteSize,
+          size: numAgents * agentInstanceByteSize,
         },
-      },
-      {
-        binding: 2,
-        resource: texture.createView(),
       },
     ],
   });
@@ -403,9 +443,7 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
       ])
     );
 
-    mat4.identity(view);
-    mat4.translate(view, view, vec3.fromValues(0, 0, -3));
-    mat4.rotateX(view, view, Math.PI * -0.2);
+    mat4.lookAt(view, vec3.fromValues(3,3,3), vec3.fromValues(0,0,0), vec3.fromValues(0,1,0));
     mat4.multiply(mvp, projection, view);
 
     // prettier-ignore
@@ -436,16 +474,16 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
       const passEncoder = commandEncoder.beginComputePass();
       passEncoder.setPipeline(computePipeline);
       passEncoder.setBindGroup(0, computeBindGroup);
-      passEncoder.dispatch(Math.ceil(numParticles / 64));
+      passEncoder.dispatch(Math.ceil(numAgents / 64));
       passEncoder.endPass();
     }
     {
       const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
       passEncoder.setPipeline(renderPipeline);
       passEncoder.setBindGroup(0, uniformBindGroup);
-      passEncoder.setVertexBuffer(0, particlesBuffer);
+      passEncoder.setVertexBuffer(0, agentsBuffer);
       passEncoder.setVertexBuffer(1, quadVertexBuffer);
-      passEncoder.draw(6, numParticles, 0, 0);
+      passEncoder.draw(6, numAgents, 0, 0);
       passEncoder.endPass();
     }
 
@@ -469,8 +507,8 @@ const Particles: () => JSX.Element = () =>
         contents: __SOURCE__,
       },
       {
-        name: './particle.wgsl',
-        contents: particleWGSL,
+        name: './crowd.wgsl',
+        contents: crowdWGSL,
         editable: true,
       },
       {
