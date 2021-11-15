@@ -66,6 +66,83 @@ export const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fra
   return pipeline;
 }
 
+export const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, presentationFormat) => {
+  const renderPipelineCrowd = device.createRenderPipeline({
+    vertex: {
+      module: device.createShaderModule({
+        code: code,
+      }),
+      entryPoint: 'vs_main',
+      buffers: [
+        {
+          // instanced agents buffer
+          arrayStride: arrayStride,
+          stepMode: 'instance',
+          attributes: [
+            {
+              // position
+              shaderLocation: 0,
+              offset: posOffset,
+              format: 'float32x3',
+            },
+            {
+              // color
+              shaderLocation: 1,
+              offset: colOffset,
+              format: 'float32x4',
+            },
+          ],
+        },
+        {
+          // quad vertex buffer
+          arrayStride: 2 * 4, // vec2<f32>
+          stepMode: 'vertex',
+          attributes: [
+            {
+              // vertex positions
+              shaderLocation: 2,
+              offset: 0,
+              format: 'float32x2',
+            },
+          ],
+        },
+      ],
+    },
+    fragment: {
+      module: device.createShaderModule({
+        code: code,
+      }),
+      entryPoint: 'fs_main',
+      targets: [
+        {
+          format: presentationFormat,
+          blend: {
+            color: {
+              srcFactor: 'src-alpha',
+              dstFactor: 'one',
+              operation: 'add',
+            },
+            alpha: {
+              srcFactor: 'zero',
+              dstFactor: 'one',
+              operation: 'add',
+            },
+          },
+        },
+      ],
+    },
+    primitive: {
+      topology: 'triangle-list',
+    },
+
+    depthStencil: {
+      depthWriteEnabled: false,
+      depthCompare: 'less',
+      format: 'depth24plus',
+    },
+  });
+  return renderPipelineCrowd;
+};
 
 export const getDepthTexture = (device: GPUDevice, presentationSize) => {
   const depthTexture = device.createTexture({
@@ -76,8 +153,8 @@ export const getDepthTexture = (device: GPUDevice, presentationSize) => {
   return depthTexture;
 }
 
-export const getUniformBuffer = (device: GPUDevice) => {
-  const uniformBufferSize = 4 * 16; // 4x4 matrix
+export const getUniformBuffer = (device: GPUDevice, size: number) => {
+  const uniformBufferSize = size; // 4x4 matrix
   const uniformBuffer = device.createBuffer({
     size: uniformBufferSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -99,24 +176,3 @@ export const getUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeli
   });
   return uniformBindGroup;
 }
-
-  
-
-//   const renderPassDescriptor: GPURenderPassDescriptor = {
-//     colorAttachments: [
-//       {
-//         view: undefined, // Assigned later
-
-//         loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-//         storeOp: 'store',
-//       },
-//     ],
-//     depthStencilAttachment: {
-//       view: depthTexture.createView(),
-
-//       depthLoadValue: 1.0,
-//       depthStoreOp: 'store',
-//       stencilLoadValue: 0,
-//       stencilStoreOp: 'store',
-//     },
-//   };

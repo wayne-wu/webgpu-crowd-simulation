@@ -1,12 +1,3 @@
-import Particles from './samples/particles';
-import Scene from './samples/scene';
+import Crowd from './samples/crowd';
 
-// const HomePage: React.FunctionComponent = () => {
-//   return (
-//     <main>
-//         <Scene />
-//     </main>
-//   );
-// };
-
-export default Scene;
+export default Crowd;
