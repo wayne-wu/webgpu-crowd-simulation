@@ -33,7 +33,7 @@ let camera : Camera;
 let aspect : number;
 
 function resetCameraFunc() {
-  camera = new Camera(vec3.fromValues(0, 2, 5), vec3.fromValues(0, 0, 0));
+  camera = new Camera(vec3.fromValues(3, 3, 3), vec3.fromValues(0, 0, 0));
   camera.setAspectRatio(aspect);
   camera.updateProjectionMatrix();
 }
@@ -41,7 +41,7 @@ function resetCameraFunc() {
 const init: SampleInit = async ({ canvasRef, gui }) => {
 
   // create camera
-  camera = new Camera(vec3.fromValues(0, 2, 5), vec3.fromValues(0, 0, 0));
+  camera = new Camera(vec3.fromValues(3, 3, 3), vec3.fromValues(0, 0, 0));
 
   const guiParams = {
     gridWidth: 5,
@@ -126,7 +126,7 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
   function getTransformationMatrix() {
     const modelMatrix = mat4.create();
     mat4.identity(modelMatrix);
-    mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(2, 0.1, 2));
+    mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(50, 0.1, 50));
 
     //return modelViewProjectionMatrix as Float32Array;
     const modelViewProjectionMatrix = mat4.create();
