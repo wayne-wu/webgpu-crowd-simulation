@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { GUI } from 'dat.gui';
+import * as Stats from 'stats-js';
 import type { Editor, EditorConfiguration } from 'codemirror';
 interface CodeMirrorEditor extends Editor {
   updatedSource: (source: string) => void;
@@ -176,7 +177,7 @@ const SampleLayout: React.FunctionComponent<
           `,
           }}
         />
-        <title>{`${props.name} - WebGPU Samples`}</title>
+        <title>{`${props.name}`}</title>
         <meta name="description" content={props.description} />
       </Head>
       <div>
