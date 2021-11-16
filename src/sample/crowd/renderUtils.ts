@@ -66,7 +66,9 @@ export const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fra
   return pipeline;
 }
 
-export const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, presentationFormat) => {
+// TODO: There's probably a way to combine getCrowdRenderPipeline() with getPipeline()
+export const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, 
+  vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
   const renderPipelineCrowd = device.createRenderPipeline({
     vertex: {
       module: device.createShaderModule({
@@ -94,14 +96,18 @@ export const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: num
           ],
         },
         {
-          // quad vertex buffer
-          arrayStride: 2 * 4, // vec2<f32>
-          stepMode: 'vertex',
+          arrayStride: vertArrayStride,
           attributes: [
             {
-              // vertex positions
+              // position
               shaderLocation: 2,
-              offset: 0,
+              offset: vertPosOffset,
+              format: 'float32x4',
+            },
+            {
+              // uv
+              shaderLocation: 3,
+              offset: vertUVOffset,
               format: 'float32x2',
             },
           ],
@@ -116,18 +122,6 @@ export const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: num
       targets: [
         {
           format: presentationFormat,
-          blend: {
-            color: {
-              srcFactor: 'src-alpha',
-              dstFactor: 'one',
-              operation: 'add',
-            },
-            alpha: {
-              srcFactor: 'zero',
-              dstFactor: 'one',
-              operation: 'add',
-            },
-          },
         },
       ],
     },

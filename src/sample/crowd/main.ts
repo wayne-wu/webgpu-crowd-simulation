@@ -19,6 +19,14 @@ import {
 } from '../../meshes/gridLines';
 
 import {
+  cubeVertexArray,
+  cubeVertexSize,
+  cubeUVOffset,
+  cubePositionOffset,
+  cubeVertexCount,
+} from '../../meshes/cube';
+
+import {
   getVerticesBuffer,
   getPipeline,
   getDepthTexture,
@@ -33,6 +41,7 @@ import {
 
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
+import { prototype } from 'module';
 
 const numAgents = 100000;
 const agentPositionOffset = 0;
@@ -145,9 +154,9 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
         device, renderWGSL, 'vs_main', 'fs_gridLines', gridLinesVertexSize,
         gridLinesPositionOffset, gridLinesUVOffset, presentationFormat, 'line-list', 'none'
   );
-  const renderPipelineCrowd = getCrowdRenderPipeline(
+  var renderPipelineCrowd = getCrowdRenderPipeline(
         device, crowdWGSL, agentInstanceByteSize, agentPositionOffset, 
-        agentColorOffset, presentationFormat
+        agentColorOffset, cubeVertexSize, cubePositionOffset, cubeUVOffset, presentationFormat
   );
 
   // Get the depth texture for both pipelines
@@ -159,14 +168,7 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
   const uniformBindGroupPlatform = getUniformBindGroup(device, pipelinePlatform, uniformBufferPlatform);
   const uniformBindGroupGridLines = getUniformBindGroup(device, pipelineGridLines, uniformBufferGridLines);
 
-  const uniformBufferSizeCrowd =
-    4 * 4 * 4 + // modelViewProjectionMatrix : mat4x4<f32>
-    3 * 4 + // right : vec3<f32>
-    4 + // padding
-    3 * 4 + // up : vec3<f32>
-    4 + // padding
-    0;
-  const uniformBufferCrowd = getUniformBuffer(device, uniformBufferSizeCrowd);
+  const uniformBufferCrowd = getUniformBuffer(device, 4 * 16);
   const uniformBindGroupCrowd = getUniformBindGroup(device, renderPipelineCrowd, uniformBufferCrowd);
 
   const renderPassDescriptor: GPURenderPassDescriptor = {
@@ -190,30 +192,10 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
 
   
   //////////////////////////////////////////////////////////////////////////////
-  // Quad vertex buffer
+  // Prototype buffer
   //////////////////////////////////////////////////////////////////////////////
-  const quadVertexBuffer = device.createBuffer({
-    size: 6 * 2 * 4, // 6x vec2<f32>
-    usage: GPUBufferUsage.VERTEX,
-    mappedAtCreation: true,
-  });
-  new Float32Array(quadVertexBuffer.getMappedRange()).set(
-    new Float32Array([
-      -1.0,
-      -1.0,
-      +1.0,
-      -1.0,
-      -1.0,
-      +1.0,
-      -1.0,
-      +1.0,
-      +1.0,
-      -1.0,
-      +1.0,
-      +1.0,
-    ])
-  );
-  quadVertexBuffer.unmap();
+  const prototypeVertexCount = cubeVertexCount;
+  const prototypeVerticesBuffer = getVerticesBuffer(device, cubeVertexArray);
 
   //////////////////////////////////////////////////////////////////////////////
   // Simulation compute pipeline
@@ -350,7 +332,6 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
 
       // -------------- Draw Crowds ------------------------ // 
       let mvp = getCrowdTransform();
-      let view = camera.viewMatrix;
       // prettier-ignore
       device.queue.writeBuffer(
         uniformBufferCrowd,
@@ -361,21 +342,13 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
           mvp[4],  mvp[5],  mvp[6],  mvp[7],
           mvp[8],  mvp[9],  mvp[10], mvp[11],
           mvp[12], mvp[13], mvp[14], mvp[15],
-
-          view[0], view[4], view[8], // right
-
-          0, // padding
-
-          view[1], view[5], view[9], // up
-
-          0, // padding
         ])
       );
       passEncoder.setPipeline(renderPipelineCrowd);
       passEncoder.setBindGroup(0, uniformBindGroupCrowd);
       passEncoder.setVertexBuffer(0, agentsBuffer);
-      passEncoder.setVertexBuffer(1, quadVertexBuffer);
-      passEncoder.draw(6, numAgents, 0, 0);
+      passEncoder.setVertexBuffer(1, prototypeVerticesBuffer);
+      passEncoder.draw(prototypeVertexCount, numAgents, 0, 0);
       passEncoder.endPass();
     }
 
