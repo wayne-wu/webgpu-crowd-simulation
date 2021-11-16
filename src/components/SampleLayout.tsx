@@ -204,7 +204,7 @@ const SampleLayout: React.FunctionComponent<
           }}
           ref={guiParentRef}
         ></div>
-        <canvas ref={canvasRef} width={1000} height={1000}></canvas>
+        <canvas ref={canvasRef} width={1600} height={900}></canvas>
       </div>
     </main>
   );
