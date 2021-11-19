@@ -36,17 +36,18 @@ import {
 } from './renderUtils';
 
 import {
-  getAgentData
+  ComputeBufferManager
 } from './crowdUtils';
 
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
+import basicCompute from '../shaders/basic.compute.wgsl';
 import { prototype } from 'module';
 
 const agentPositionOffset = 0;
 const agentColorOffset = 4 * 4;
-const agentInstanceByteSize =
-  3 * 4 + // position
+const agentInstanceByteSize = // number of bytes per agent
+  3 * 4 + // 3 position floats
   1 * 4 + // lifetime
   4 * 4 + // color
   3 * 4 + // velocity
@@ -133,6 +134,14 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
     size: presentationSize,
   });
 
+  /////////////////////////////////////////////////////////////////////////
+  //                     Initial Buffer Setup                            //
+  /////////////////////////////////////////////////////////////////////////
+  var compBuffManager = new ComputeBufferManager(device, 
+                                                 simulationParams.numAgents,
+                                                 agentInstanceByteSize);
+
+
   ////////////////////////////////////////////////////////////////////////////
   //                   Render Pipelines Setup                               //
   ////////////////////////////////////////////////////////////////////////////
@@ -142,17 +151,6 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
   // Compute the grid lines based on an input gridWidth
   let gridLinesVertexArray = getGridLines(guiParams.gridWidth);
   let verticesBufferGridLines = getVerticesBuffer(device, gridLinesVertexArray);
-
-  let initialAgentData = getAgentData(simulationParams.numAgents);
-  let agentsBuffer = device.createBuffer({
-    size: simulationParams.numAgents * agentInstanceByteSize,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
-    mappedAtCreation: true
-  });
-  new Float32Array(agentsBuffer.getMappedRange()).set(
-    initialAgentData
-  );
-  agentsBuffer.unmap();
 
   // Create render pipelines for platform and grid lines
   const pipelinePlatform = getPipeline(
@@ -210,16 +208,6 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
   // Simulation compute pipeline
   //////////////////////////////////////////////////////////////////////////////
 
-  let simulationUBOBufferSize =
-    1 * 4 + // deltaTime
-    3 * 4 + // padding
-    4 * 4 + // seed
-    0;
-  let simulationUBOBuffer = device.createBuffer({
-    size: simulationUBOBufferSize,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
-
   let computePipeline = device.createComputePipeline({
     compute: {
       module: device.createShaderModule({
@@ -228,25 +216,8 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
       entryPoint: 'simulate',
     },
   });
-  let computeBindGroup = device.createBindGroup({
-    layout: computePipeline.getBindGroupLayout(0),
-    entries: [
-      {
-        binding: 0,
-        resource: {
-          buffer: simulationUBOBuffer,
-        },
-      },
-      {
-        binding: 1,
-        resource: {
-          buffer: agentsBuffer,
-          offset: 0,
-          size: simulationParams.numAgents * agentInstanceByteSize,
-        },
-      },
-    ],
-  });
+
+  var computeBindGroup = compBuffManager.getBindGroup(computePipeline);
 
   function getTransformationMatrix() {
     const modelMatrix = mat4.create();
@@ -290,52 +261,15 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
       }
       // recompute agent buffer if resetSim button pressed
       if (resetSim){
-        initialAgentData = getAgentData(simulationParams.numAgents);
-        agentsBuffer = device.createBuffer({
-          size: simulationParams.numAgents * agentInstanceByteSize,
-          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
-          mappedAtCreation: true
-        });
-        new Float32Array(agentsBuffer.getMappedRange()).set(
-          initialAgentData
-        );
-        agentsBuffer.unmap();
-        computeBindGroup = device.createBindGroup({
-          layout: computePipeline.getBindGroupLayout(0),
-          entries: [
-            {
-              binding: 0,
-              resource: {
-                buffer: simulationUBOBuffer,
-              },
-            },
-            {
-              binding: 1,
-              resource: {
-                buffer: agentsBuffer,
-                offset: 0,
-                size: simulationParams.numAgents * agentInstanceByteSize,
-              },
-            },
-          ],
-        });
+        compBuffManager.numAgents = simulationParams.numAgents;
+        // reinitilize buffers based on the new number of agents
+        compBuffManager.initBuffers();
+        computeBindGroup = compBuffManager.getBindGroup(computePipeline);
         resetSim = false;
       }
 
-      device.queue.writeBuffer(
-        simulationUBOBuffer,
-        0,
-        new Float32Array([
-          simulationParams.simulate ? simulationParams.deltaTime : 0.0,
-          0.0,
-          0.0,
-          0.0, // padding
-          Math.random() * 100,
-          Math.random() * 100, // seed.xy
-          1 + Math.random(),
-          1 + Math.random(), // seed.zw
-        ])
-      );
+      // write the parameters to the Uniform buffer for our compute shaders
+      compBuffManager.writeSimParams(simulationParams);
 
       const passEncoder = commandEncoder.beginComputePass();
       passEncoder.setPipeline(computePipeline);
@@ -397,7 +331,7 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
       );
       passEncoder.setPipeline(renderPipelineCrowd);
       passEncoder.setBindGroup(0, uniformBindGroupCrowd);
-      passEncoder.setVertexBuffer(0, agentsBuffer);
+      passEncoder.setVertexBuffer(0, compBuffManager.agentsBuffer);
       passEncoder.setVertexBuffer(1, prototypeVerticesBuffer);
       passEncoder.draw(prototypeVertexCount, simulationParams.numAgents, 0, 0);
       passEncoder.endPass();
