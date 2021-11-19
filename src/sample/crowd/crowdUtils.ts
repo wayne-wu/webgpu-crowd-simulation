@@ -158,7 +158,7 @@ export class ComputeBufferManager {
   });
   }
 
-  getBindGroup(computePipeline){
+  getBindGroup(){
     var computeBindGroup = this.device.createBindGroup({
       layout: this.bindGroupLayout,
       entries: [

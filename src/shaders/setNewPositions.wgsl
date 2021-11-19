@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Set New Positions
+// Simulation Compute shader
 ////////////////////////////////////////////////////////////////////////////////
 [[block]] struct SimulationParams {
   deltaTime : f32;
@@ -17,20 +17,35 @@ struct Agent {
   agents : array<Agent>;
 };
 
+struct Goal {
+  vel : vec3<f32>;
+};
+
+[[block]] struct GoalData {
+  goals : array<Goal>;
+};
+
+struct Cell {
+  id : u32;
+};
+
+[[block]] struct GridCells {
+  cells : array<Cell>;
+};
+
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
-[[binding(1), group(0)]] var<storage, read_write> data : Agents;
+[[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
+[[binding(2), group(0)]] var<storage, read_write> goalData : GoalData;
+[[binding(3), group(0)]] var<storage, read_write> gridCell : GridCells;
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
-  // This is just a simple compute shader to update the position
-  // of agents based on their previously calculated velocity
-
   let idx = GlobalInvocationID.x;
-  var agent = data.agents[idx];
+  var agent = agentData.agents[idx];
 
-  // Basic velocity integration
+  // use calculated velocity to set the new position
   agent.position = agent.position + sim_params.deltaTime * agent.velocity;
 
   // Store the new agent value
-  data.agents[idx] = agent;
+  agentData.agents[idx] = agent;
 }

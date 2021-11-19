@@ -42,10 +42,10 @@ import {
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
 import planVelocityWGSL from '../../shaders/planVelocity.wgsl';
-//import findNeighborsWGSL from '../../shaders/findNeighbors.wgsl';
-//import correctPlannedVelocityWGSL from '../../shaders/correctPlannedVelocity.wgsl';
-//import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.wgsl';
-//import setNewPositionsWGSL from '../../shaders/setNewPositions.wgsl';
+import findNeighborsWGSL from '../../shaders/findNeighbors.wgsl';
+import correctPlannedVelocityWGSL from '../../shaders/correctPlannedVelocity.wgsl';
+import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.wgsl';
+import setNewPositionsWGSL from '../../shaders/setNewPositions.wgsl';
 import { prototype } from 'module';
 
 const agentPositionOffset = 0;
@@ -209,23 +209,95 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const prototypeVerticesBuffer = getVerticesBuffer(device, cubeVertexArray);
 
   //////////////////////////////////////////////////////////////////////////////
-  // Simulation compute pipeline
+  // Create Compute Pipelines
   //////////////////////////////////////////////////////////////////////////////
 
+  var computePipelines = [];
 
-  let computePipeline = device.createComputePipeline({
-    layout: device.createPipelineLayout({
-        bindGroupLayouts: [compBuffManager.bindGroupLayout]
-    }),
-    compute: {
-      module: device.createShaderModule({
-        code: planVelocityWGSL,
+  // plan velocity:
+  // ignoring interactions, where does each agent want to go?
+  computePipelines.push( 
+      device.createComputePipeline({
+      layout: device.createPipelineLayout({
+          bindGroupLayouts: [compBuffManager.bindGroupLayout]
       }),
-      entryPoint: 'main',
-    },
-  });
+      compute: {
+        module: device.createShaderModule({
+          code: planVelocityWGSL,
+        }),
+        entryPoint: 'main',
+      },
+    })
+  );
 
-  var computeBindGroup = compBuffManager.getBindGroup(computePipeline);
+
+  // find neighbors:
+  // to calculate interactions, first find which agents are near enough
+  // to interact
+  computePipelines.push( 
+    device.createComputePipeline({
+      layout: device.createPipelineLayout({
+          bindGroupLayouts: [compBuffManager.bindGroupLayout]
+      }),
+      compute: {
+        module: device.createShaderModule({
+          code: findNeighborsWGSL,
+        }),
+        entryPoint: 'main',
+      },
+    })
+  );
+
+  // correct planned velocity:
+  // iteratively refine planned next position
+  computePipelines.push( 
+    device.createComputePipeline({
+      layout: device.createPipelineLayout({
+          bindGroupLayouts: [compBuffManager.bindGroupLayout]
+      }),
+      compute: {
+        module: device.createShaderModule({
+          code: correctPlannedVelocityWGSL,
+        }),
+        entryPoint: 'main',
+      },
+    })
+  );
+
+  // finalize velocity:
+  // calc velocity based on refined plan and an XSPH viscosity component
+  computePipelines.push( 
+    device.createComputePipeline({
+      layout: device.createPipelineLayout({
+          bindGroupLayouts: [compBuffManager.bindGroupLayout]
+      }),
+      compute: {
+        module: device.createShaderModule({
+          code: finalizeVelocityWGSL,
+        }),
+        entryPoint: 'main',
+      },
+    })
+  );
+
+  // Set new positions:
+  // using the calculated velocity, update the agent to its new location
+  computePipelines.push( 
+    device.createComputePipeline({
+      layout: device.createPipelineLayout({
+          bindGroupLayouts: [compBuffManager.bindGroupLayout]
+      }),
+      compute: {
+        module: device.createShaderModule({
+          code: setNewPositionsWGSL,
+        }),
+        entryPoint: 'main',
+      },
+    })
+  );
+
+  // get compute bind group
+  var computeBindGroup = compBuffManager.getBindGroup();
 
   function getTransformationMatrix() {
     const modelMatrix = mat4.create();
@@ -273,17 +345,22 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         compBuffManager.numAgents = simulationParams.numAgents;
         // reinitilize buffers based on the new number of agents
         compBuffManager.initBuffers();
-        computeBindGroup = compBuffManager.getBindGroup(computePipeline);
+        computeBindGroup = compBuffManager.getBindGroup();
         resetSim = false;
       }
 
       // write the parameters to the Uniform buffer for our compute shaders
       compBuffManager.writeSimParams(simulationParams);
 
+      // execute each compute shader in the order they were pushed onto
+      // the computePipelines array
       const passEncoder = commandEncoder.beginComputePass();
-      passEncoder.setPipeline(computePipeline);
-      passEncoder.setBindGroup(0, computeBindGroup);
-      passEncoder.dispatch(Math.ceil(simulationParams.numAgents / 64));
+      for (let i = 0; i < computePipelines.length; i++){
+        passEncoder.setPipeline(computePipelines[i]);
+        passEncoder.setBindGroup(0, computeBindGroup);
+        // kick off the compute shader
+        passEncoder.dispatch(Math.ceil(simulationParams.numAgents / 64));
+      }
       passEncoder.endPass();
 
     }
