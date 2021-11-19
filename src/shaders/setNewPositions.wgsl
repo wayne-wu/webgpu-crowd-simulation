@@ -17,26 +17,23 @@ struct Agent {
   agents : array<Agent>;
 };
 
-struct Goal {
-  vel : vec3<f32>;
+[[block]] struct PlannedPosData {
+  positions : array<vec2<f32>>;
 };
 
 [[block]] struct GoalData {
-  goals : array<Goal>;
-};
-
-struct Cell {
-  id : u32;
+  goals : array<vec3<f32>>;
 };
 
 [[block]] struct GridCells {
-  cells : array<Cell>;
+  cells : array<u32>;
 };
 
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
-[[binding(2), group(0)]] var<storage, read_write> goalData : GoalData;
-[[binding(3), group(0)]] var<storage, read_write> gridCell : GridCells;
+[[binding(2), group(0)]] var<storage, read_write> plannedPosData : PlannedPosData;
+[[binding(3), group(0)]] var<storage, read_write> goalData : GoalData;
+[[binding(4), group(0)]] var<storage, read_write> gridCell : GridCells;
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {

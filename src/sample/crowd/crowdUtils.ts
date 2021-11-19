@@ -8,6 +8,7 @@ export class ComputeBufferManager {
 
   // buffer item sizes (for buffers that might change size)
   agentInstanceSize : number;
+  plannedPositionItemSize : number;
   goalBufferItemSize : number;
   gridCellBufferItemSize : number;
 
@@ -15,8 +16,9 @@ export class ComputeBufferManager {
 
   // buffers
   simulationUBOBuffer : GPUBuffer;
-  agentsBuffer : GPUBuffer;
-  gridCellBuffer : GPUBuffer;
+  agentsBuffer : GPUBuffer; // data on each agent, including position, velocity, etc.
+  plannedPositionBuffer : GPUBuffer; // the position an agent will move to during this time step
+  gridCellBuffer : GPUBuffer; // the grid cell each agent belongs to
   goalBuffer : GPUBuffer; // currently the preferred velocity, could be location sought
 
   // bind group layout
@@ -41,6 +43,7 @@ export class ComputeBufferManager {
     // --- set item sizes (for buffers that might change size) ---
     this.goalBufferItemSize = (3 + 1) * 4; // a vec3<f32> plus 1 byte of padding per agent
     this.gridCellBufferItemSize = 4; // a u32 per agent
+    this.plannedPositionItemSize = 2 * 4; // a vec2<f32>
 
 
     this.initBuffers();
@@ -70,6 +73,12 @@ export class ComputeBufferManager {
     // grid cell buffer
     this.gridCellBuffer = this.device.createBuffer({
       size: this.numAgents * this.gridCellBufferItemSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    // planned position buffer
+    this.plannedPositionBuffer = this.device.createBuffer({
+      size: this.numAgents * this.plannedPositionItemSize,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
@@ -141,14 +150,21 @@ export class ComputeBufferManager {
         }
       },
       {
-        binding: 2, // goal buffer
+        binding: 2, // planned position buffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
         }
       },
       {
-        binding: 3, // grid cell buffer
+        binding: 3, // goal buffer
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage"
+        }
+      },
+      {
+        binding: 4, // grid cell buffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
@@ -179,13 +195,21 @@ export class ComputeBufferManager {
         {
           binding: 2,
           resource: {
+            buffer: this.plannedPositionBuffer,
+            offset: 0,
+            size: this.numAgents * this.plannedPositionItemSize,
+          },
+        },
+        {
+          binding: 3,
+          resource: {
             buffer: this.goalBuffer,
             offset: 0,
             size: this.numAgents * this.goalBufferItemSize,
           },
         },
         {
-          binding: 3,
+          binding: 4,
           resource: {
             buffer: this.gridCellBuffer,
             offset: 0,
