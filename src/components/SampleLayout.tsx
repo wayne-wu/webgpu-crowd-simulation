@@ -154,7 +154,7 @@ const SampleLayout: React.FunctionComponent<
         const index = props.sources.findIndex(
           ({ contents }) => contents == source
         );
-        sources[index].updateCallbacks.push(updatedSource);
+        //sources[index].updateCallbacks.push(updatedSource);
       });
     }
   }, [sources]);
