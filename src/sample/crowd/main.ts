@@ -41,7 +41,11 @@ import {
 
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
-import basicCompute from '../shaders/basic.compute.wgsl';
+import planVelocityWGSL from '../../shaders/planVelocity.wgsl';
+//import findNeighborsWGSL from '../../shaders/findNeighbors.wgsl';
+//import correctPlannedVelocityWGSL from '../../shaders/correctPlannedVelocity.wgsl';
+//import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.wgsl';
+//import setNewPositionsWGSL from '../../shaders/setNewPositions.wgsl';
 import { prototype } from 'module';
 
 const agentPositionOffset = 0;
@@ -97,7 +101,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const simulationParams = {
     simulate: true,
     deltaTime: 0.04,
-    numAgents: 100000,
+    numAgents: 10000,
     resetSimulation: () => { resetSim = true; }
   };
 
@@ -208,12 +212,16 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   // Simulation compute pipeline
   //////////////////////////////////////////////////////////////////////////////
 
+
   let computePipeline = device.createComputePipeline({
+    layout: device.createPipelineLayout({
+        bindGroupLayouts: [compBuffManager.bindGroupLayout]
+    }),
     compute: {
       module: device.createShaderModule({
-        code: crowdWGSL,
+        code: planVelocityWGSL,
       }),
-      entryPoint: 'simulate',
+      entryPoint: 'main',
     },
   });
 
@@ -235,7 +243,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     mat4.multiply(modelViewProjectionMatrix, camera.projectionMatrix, camera.viewMatrix);
     return modelViewProjectionMatrix;
   }
-
+  
   function frame() {
     stats.begin();
     // Sample is no longer the active page.
@@ -277,6 +285,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       passEncoder.setBindGroup(0, computeBindGroup);
       passEncoder.dispatch(Math.ceil(simulationParams.numAgents / 64));
       passEncoder.endPass();
+
     }
     // ------------------ Render Calls ------------------------- //
     {
