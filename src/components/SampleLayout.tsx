@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { GUI } from 'dat.gui';
-import * as Stats from 'stats-js';
+import * as Stats from 'stats.js';
 import type { Editor, EditorConfiguration } from 'codemirror';
 interface CodeMirrorEditor extends Editor {
   updatedSource: (source: string) => void;
@@ -20,6 +20,7 @@ type SourceFileInfo = {
 export type SampleInit = (params: {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   gui?: GUI;
+  stats?: Stats;
 }) => void | Promise<void>;
 
 const setShaderRegisteredCallback =
@@ -90,6 +91,7 @@ const SampleLayout: React.FunctionComponent<
     description: string;
     filename: string;
     gui?: boolean;
+    stats?: boolean;
     init: SampleInit;
     sources: SourceFileInfo[];
   }>
@@ -113,6 +115,16 @@ const SampleLayout: React.FunctionComponent<
     return undefined;
   }, []);
 
+  const statsParentRef = useRef<HTMLDivElement | null>(null);
+  const stats: Stats | undefined = useMemo(() => {
+    if (props.stats && process.browser) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const stats = require('stats.js');
+      return new stats();
+    }
+    return undefined;
+  }, []);
+
   const router = useRouter();
   const currentHash = router.asPath.match(/#([a-zA-Z0-9\.\/]+)/);
 
@@ -130,10 +142,15 @@ const SampleLayout: React.FunctionComponent<
       guiParentRef.current.appendChild(gui.domElement);
     }
 
+    if (stats && statsParentRef) {
+      statsParentRef.current.appendChild(stats.domElement);
+    }
+
     try {
       const p = props.init({
         canvasRef,
         gui,
+        stats
       });
 
       if (p instanceof Promise) {
@@ -177,7 +194,7 @@ const SampleLayout: React.FunctionComponent<
           `,
           }}
         />
-        <title>{`${props.name}`}</title>
+        <title className={styles.title}>{`${props.name}`}</title>
         <meta name="description" content={props.description} />
       </Head>
       <div>
@@ -204,6 +221,13 @@ const SampleLayout: React.FunctionComponent<
             right: 10,
           }}
           ref={guiParentRef}
+        ></div>
+        <div
+          style={{
+            position: 'absolute',
+            left: 10,
+          }}
+          ref={statsParentRef}
         ></div>
         <canvas ref={canvasRef} width={1600} height={900}></canvas>
       </div>

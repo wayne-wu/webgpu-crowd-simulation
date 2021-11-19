@@ -58,3 +58,7 @@ nav.sourceFileNav li a[data-active=true] {
   right: 0;
   z-index: 100;
 }
+
+.title {
+  margin-left: 20px;
+}

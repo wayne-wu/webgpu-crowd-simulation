@@ -64,7 +64,7 @@ function resetCameraFunc() {
   camera.updateProjectionMatrix();
 }
 
-const init: SampleInit = async ({ canvasRef, gui }) => {
+const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   //---------------------- Setup Camera --------------------------------//
   camera = new Camera(vec3.fromValues(3, 3, 3), vec3.fromValues(0, 0, 0));
@@ -266,6 +266,7 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
   }
 
   function frame() {
+    stats.begin();
     // Sample is no longer the active page.
     if (!canvasRef.current) return;
 
@@ -405,6 +406,7 @@ const init: SampleInit = async ({ canvasRef, gui }) => {
 
     device.queue.submit([commandEncoder.finish()]);
     requestAnimationFrame(frame);
+    stats.end();
   }
   requestAnimationFrame(frame);
 };
@@ -416,6 +418,7 @@ const Crowd: () => JSX.Element = () =>
       'This is a WebGPU Crowd Simulation.',
     init,
     gui: true,
+    stats: true,
     sources: [
       {
         name: __filename.substr(__dirname.length + 1),
