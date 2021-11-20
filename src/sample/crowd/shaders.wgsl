@@ -6,6 +6,11 @@
     modelViewProjectionMatrix : mat4x4<f32>;
   };
   [[binding(0), group(0)]] var<uniform> uniforms : Uniforms;
+
+[[block]] struct Neighbors {
+  neighbors : array<u32>;
+};
+[[binding(1), group(0)]] var<storage> neighborData : Neighbors;
   
   struct VertexOutput {
     [[builtin(position)]] Position : vec4<f32>;
