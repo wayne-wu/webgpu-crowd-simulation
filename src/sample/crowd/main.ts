@@ -2,42 +2,8 @@ import { mat4, vec3 } from 'gl-matrix';
 import { makeSample, SampleInit } from '../../components/SampleLayout';
 import Camera from "./Camera";
 
-import {
-  platformVertexArray,
-  platformVertexSize,
-  platformUVOffset,
-  platformPositionOffset,
-  platformVertexCount,
-} from '../../meshes/platform';
-
-import {
-  getGridLines,
-  gridLinesVertexSize,
-  gridLinesVertexCount,
-  gridLinesPositionOffset,
-  gridLinesUVOffset
-} from '../../meshes/gridLines';
-
-import {
-  cubeVertexArray,
-  cubeVertexSize,
-  cubeUVOffset,
-  cubePositionOffset,
-  cubeVertexCount,
-} from '../../meshes/cube';
-
-import {
-  getVerticesBuffer,
-  getPipeline,
-  getDepthTexture,
-  getUniformBuffer,
-  getUniformBindGroup,
-  getCrowdRenderPipeline
-} from './renderUtils';
-
-import {
-  ComputeBufferManager
-} from './crowdUtils';
+import { ComputeBufferManager } from './crowdUtils';
+import { renderBufferManager } from './renderUtils';
 
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
@@ -46,7 +12,6 @@ import findNeighborsWGSL from '../../shaders/findNeighbors.wgsl';
 import correctPlannedVelocityWGSL from '../../shaders/correctPlannedVelocity.wgsl';
 import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.wgsl';
 import setNewPositionsWGSL from '../../shaders/setNewPositions.wgsl';
-import { prototype } from 'module';
 
 const agentPositionOffset = 0;
 const agentColorOffset = 4 * 4;
@@ -71,7 +36,10 @@ function resetCameraFunc() {
 
 const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
-  //---------------------- Setup Camera --------------------------------//
+  ///////////////////////////////////////////////////////////////////////
+  //                       Camera Setup                                //
+  ///////////////////////////////////////////////////////////////////////
+
   camera = new Camera(vec3.fromValues(3, 3, 3), vec3.fromValues(0, 0, 0));
   aspect = canvasRef.current.width / canvasRef.current.height;
   camera.setAspectRatio(aspect);
@@ -139,162 +107,107 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   });
 
   /////////////////////////////////////////////////////////////////////////
-  //                     Initial Buffer Setup                            //
+  //                     Compute Buffer Setup                            //
   /////////////////////////////////////////////////////////////////////////
   var compBuffManager = new ComputeBufferManager(device, 
                                                  simulationParams.numAgents,
                                                  agentInstanceByteSize);
 
-
-  ////////////////////////////////////////////////////////////////////////////
-  //                   Render Pipelines Setup                               //
-  ////////////////////////////////////////////////////////////////////////////
-
-  // Create vertex buffers for the platform and the grid lines
-  const verticesBufferPlatform = getVerticesBuffer(device, platformVertexArray);
-  // Compute the grid lines based on an input gridWidth
-  let gridLinesVertexArray = getGridLines(guiParams.gridWidth);
-  let verticesBufferGridLines = getVerticesBuffer(device, gridLinesVertexArray);
-
-  // Create render pipelines for platform and grid lines
-  const pipelinePlatform = getPipeline(
-        device, renderWGSL, 'vs_main', 'fs_platform', platformVertexSize,
-        platformPositionOffset, platformUVOffset, presentationFormat, 'triangle-list', 'back'
-  );
-  const pipelineGridLines = getPipeline(
-        device, renderWGSL, 'vs_main', 'fs_gridLines', gridLinesVertexSize,
-        gridLinesPositionOffset, gridLinesUVOffset, presentationFormat, 'line-list', 'none'
-  );
-  var renderPipelineCrowd = getCrowdRenderPipeline(
-        device, crowdWGSL, agentInstanceByteSize, agentPositionOffset, 
-        agentColorOffset, cubeVertexSize, cubePositionOffset, cubeUVOffset, presentationFormat
-  );
-
-  // Get the depth texture for both pipelines
-  const depthTexture = getDepthTexture(device, presentationSize);
-
-  const uniformBufferPlatform = getUniformBuffer(device, 4 * 16);
-  const uniformBufferGridLines = getUniformBuffer(device, 4 * 16);
-  
-  const uniformBindGroupPlatform = getUniformBindGroup(device, pipelinePlatform, uniformBufferPlatform);
-  const uniformBindGroupGridLines = getUniformBindGroup(device, pipelineGridLines, uniformBufferGridLines);
-
-  const uniformBufferCrowd = getUniformBuffer(device, 4 * 16);
-  const uniformBindGroupCrowd = getUniformBindGroup(device, renderPipelineCrowd, uniformBufferCrowd);
-
-  const renderPassDescriptor: GPURenderPassDescriptor = {
-    colorAttachments: [
-      {
-        view: undefined, // Assigned later
-
-        loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-        storeOp: 'store',
-      },
-    ],
-    depthStencilAttachment: {
-      view: depthTexture.createView(),
-
-      depthLoadValue: 1.0,
-      depthStoreOp: 'store',
-      stencilLoadValue: 0,
-      stencilStoreOp: 'store',
-    },
-  };
-
-  
-  //////////////////////////////////////////////////////////////////////////////
-  // Prototype buffer
-  //////////////////////////////////////////////////////////////////////////////
-  const prototypeVertexCount = cubeVertexCount;
-  const prototypeVerticesBuffer = getVerticesBuffer(device, cubeVertexArray);
+  //////////////////////////////////////////////////////////////////////////
+  //                Render Buffer and Pipeline Setup                      //
+  //////////////////////////////////////////////////////////////////////////
+  var renderBuffManager = new renderBufferManager(device, guiParams.gridWidth, 
+                                                  presentationFormat, presentationSize,
+                                                  agentInstanceByteSize, agentPositionOffset, agentColorOffset);
 
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
   //////////////////////////////////////////////////////////////////////////////
+  {
+    var computePipelines = [];
 
-  var computePipelines = [];
+    // plan velocity:
+    // ignoring interactions, where does each agent want to go?
+    computePipelines.push( 
+        device.createComputePipeline({
+        layout: device.createPipelineLayout({
+            bindGroupLayouts: [compBuffManager.bindGroupLayout]
+        }),
+        compute: {
+          module: device.createShaderModule({
+            code: planVelocityWGSL,
+          }),
+          entryPoint: 'main',
+        },
+      })
+    );
 
-  // plan velocity:
-  // ignoring interactions, where does each agent want to go?
-  computePipelines.push( 
+
+    // find neighbors:
+    // to calculate interactions, first find which agents are near enough
+    // to interact
+    computePipelines.push( 
       device.createComputePipeline({
-      layout: device.createPipelineLayout({
-          bindGroupLayouts: [compBuffManager.bindGroupLayout]
-      }),
-      compute: {
-        module: device.createShaderModule({
-          code: planVelocityWGSL,
+        layout: device.createPipelineLayout({
+            bindGroupLayouts: [compBuffManager.bindGroupLayout]
         }),
-        entryPoint: 'main',
-      },
-    })
-  );
+        compute: {
+          module: device.createShaderModule({
+            code: findNeighborsWGSL,
+          }),
+          entryPoint: 'main',
+        },
+      })
+    );
 
-
-  // find neighbors:
-  // to calculate interactions, first find which agents are near enough
-  // to interact
-  computePipelines.push( 
-    device.createComputePipeline({
-      layout: device.createPipelineLayout({
-          bindGroupLayouts: [compBuffManager.bindGroupLayout]
-      }),
-      compute: {
-        module: device.createShaderModule({
-          code: findNeighborsWGSL,
+    // correct planned velocity:
+    // iteratively refine planned next position
+    computePipelines.push( 
+      device.createComputePipeline({
+        layout: device.createPipelineLayout({
+            bindGroupLayouts: [compBuffManager.bindGroupLayout]
         }),
-        entryPoint: 'main',
-      },
-    })
-  );
+        compute: {
+          module: device.createShaderModule({
+            code: correctPlannedVelocityWGSL,
+          }),
+          entryPoint: 'main',
+        },
+      })
+    );
 
-  // correct planned velocity:
-  // iteratively refine planned next position
-  computePipelines.push( 
-    device.createComputePipeline({
-      layout: device.createPipelineLayout({
-          bindGroupLayouts: [compBuffManager.bindGroupLayout]
-      }),
-      compute: {
-        module: device.createShaderModule({
-          code: correctPlannedVelocityWGSL,
+    // finalize velocity:
+    // calc velocity based on refined plan and an XSPH viscosity component
+    computePipelines.push( 
+      device.createComputePipeline({
+        layout: device.createPipelineLayout({
+            bindGroupLayouts: [compBuffManager.bindGroupLayout]
         }),
-        entryPoint: 'main',
-      },
-    })
-  );
+        compute: {
+          module: device.createShaderModule({
+            code: finalizeVelocityWGSL,
+          }),
+          entryPoint: 'main',
+        },
+      })
+    );
 
-  // finalize velocity:
-  // calc velocity based on refined plan and an XSPH viscosity component
-  computePipelines.push( 
-    device.createComputePipeline({
-      layout: device.createPipelineLayout({
-          bindGroupLayouts: [compBuffManager.bindGroupLayout]
-      }),
-      compute: {
-        module: device.createShaderModule({
-          code: finalizeVelocityWGSL,
+    // Set new positions:
+    // using the calculated velocity, update the agent to its new location
+    computePipelines.push( 
+      device.createComputePipeline({
+        layout: device.createPipelineLayout({
+            bindGroupLayouts: [compBuffManager.bindGroupLayout]
         }),
-        entryPoint: 'main',
-      },
-    })
-  );
-
-  // Set new positions:
-  // using the calculated velocity, update the agent to its new location
-  computePipelines.push( 
-    device.createComputePipeline({
-      layout: device.createPipelineLayout({
-          bindGroupLayouts: [compBuffManager.bindGroupLayout]
-      }),
-      compute: {
-        module: device.createShaderModule({
-          code: setNewPositionsWGSL,
-        }),
-        entryPoint: 'main',
-      },
-    })
-  );
+        compute: {
+          module: device.createShaderModule({
+            code: setNewPositionsWGSL,
+          }),
+          entryPoint: 'main',
+        },
+      })
+    );
+  }
 
   // get compute bind group
   var computeBindGroup = compBuffManager.getBindGroup();
@@ -323,8 +236,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     // Compute new grid lines if there's a change in the gui
     if (prevGridWidth != guiParams.gridWidth) {
-      gridLinesVertexArray = getGridLines(guiParams.gridWidth);
-      verticesBufferGridLines = getVerticesBuffer(device, gridLinesVertexArray);
+      renderBuffManager.resetGridLinesBuffer(guiParams.gridWidth);
       prevGridWidth = guiParams.gridWidth;
     }
 
@@ -368,62 +280,18 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     {
       const transformationMatrix = getTransformationMatrix();
 
-      renderPassDescriptor.colorAttachments[0].view = context
+      renderBuffManager.renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
 
-      const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+      const passEncoder = commandEncoder.beginRenderPass(renderBuffManager.renderPassDescriptor);
 
-      // ------------- Draw Platform ---------------------- //
-      device.queue.writeBuffer(
-        uniformBufferPlatform,
-        0,
-        transformationMatrix.buffer,
-        transformationMatrix.byteOffset,
-        transformationMatrix.byteLength
-      );
-      passEncoder.setPipeline(pipelinePlatform);
-      passEncoder.setBindGroup(0, uniformBindGroupPlatform);
-      passEncoder.setVertexBuffer(0, verticesBufferPlatform);
-      passEncoder.draw(platformVertexCount, 1, 0, 0);
+      // ----------------------- Draw ------------------------- //
+      renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder);
+      renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder, guiParams.gridOn);
+      renderBuffManager.drawCrowd(device, getCrowdTransform(), passEncoder, compBuffManager.agentsBuffer, simulationParams.numAgents);
 
-      // ------------- Draw Grid Lines --------------------- //
-      if (guiParams.gridOn){
-        device.queue.writeBuffer(
-          uniformBufferGridLines,
-          0,
-          transformationMatrix.buffer,
-          transformationMatrix.byteOffset,
-          transformationMatrix.byteLength
-        );
-        passEncoder.setPipeline(pipelineGridLines);
-        passEncoder.setBindGroup(0, uniformBindGroupGridLines);
-        passEncoder.setVertexBuffer(0, verticesBufferGridLines);
-        passEncoder.draw(gridLinesVertexCount, 1, 0, 0);
-      }
-
-      // -------------- Draw Crowds ------------------------ // 
-      let mvp = getCrowdTransform();
-      // prettier-ignore
-      device.queue.writeBuffer(
-        uniformBufferCrowd,
-        0,
-          new Float32Array([
-          // modelViewProjectionMatrix
-          mvp[0],  mvp[1],  mvp[2],  mvp[3],
-          mvp[4],  mvp[5],  mvp[6],  mvp[7],
-          mvp[8],  mvp[9],  mvp[10], mvp[11],
-          mvp[12], mvp[13], mvp[14], mvp[15],
-        ])
-      );
-      passEncoder.setPipeline(renderPipelineCrowd);
-      passEncoder.setBindGroup(0, uniformBindGroupCrowd);
-      passEncoder.setVertexBuffer(0, compBuffManager.agentsBuffer);
-      passEncoder.setVertexBuffer(1, prototypeVerticesBuffer);
-      passEncoder.draw(prototypeVertexCount, simulationParams.numAgents, 0, 0);
-      passEncoder.endPass();
-    }
-
+    }      
     device.queue.submit([commandEncoder.finish()]);
     requestAnimationFrame(frame);
     stats.end();

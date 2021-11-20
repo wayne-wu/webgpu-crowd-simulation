@@ -11,6 +11,7 @@ export class ComputeBufferManager {
   plannedPositionItemSize : number;
   goalBufferItemSize : number;
   gridCellBufferItemSize : number;
+  neighborBufferItemSize : number;
 
   device : GPUDevice;
 
@@ -20,6 +21,7 @@ export class ComputeBufferManager {
   plannedPositionBuffer : GPUBuffer; // the position an agent will move to during this time step
   gridCellBuffer : GPUBuffer; // the grid cell each agent belongs to
   goalBuffer : GPUBuffer; // currently the preferred velocity, could be location sought
+  neighborBuffer : GPUBuffer; // neighbors for each agent -- max is numAgents per each agent
 
   // bind group layout
   bindGroupLayout : GPUBindGroupLayout;
@@ -44,6 +46,7 @@ export class ComputeBufferManager {
     this.goalBufferItemSize = (3 + 1) * 4; // a vec3<f32> plus 1 byte of padding per agent
     this.gridCellBufferItemSize = 4; // a u32 per agent
     this.plannedPositionItemSize = 2 * 4; // a vec2<f32>
+    this.neighborBufferItemSize = 20 * 4; // max numAgents ints (neighbor indices) (had to divide by 4 or exceeds max buffer size)
 
 
     this.initBuffers();
@@ -79,6 +82,11 @@ export class ComputeBufferManager {
     // planned position buffer
     this.plannedPositionBuffer = this.device.createBuffer({
       size: this.numAgents * this.plannedPositionItemSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    this.neighborBuffer = this.device.createBuffer({
+      size: this.numAgents * this.neighborBufferItemSize,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
@@ -169,6 +177,13 @@ export class ComputeBufferManager {
         buffer: {
           type: "storage"
         }
+      },
+      {
+        binding: 5, // neighbors buffer
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage"
+        }
       }
     ]
   });
@@ -216,6 +231,14 @@ export class ComputeBufferManager {
             size: this.numAgents * this.gridCellBufferItemSize,
           },
         },
+        {
+          binding: 5,
+          resource: {
+            buffer: this.neighborBuffer,
+            offset: 0,
+            size: this.numAgents * this.neighborBufferItemSize,
+          },
+        },
       ],
     });
     return computeBindGroup;
@@ -230,7 +253,7 @@ export class ComputeBufferManager {
       // position.xyz
       initialAgentData[agentIdxOffset * i + 0] = scatterWidth * (Math.random() - 0.5);
       initialAgentData[agentIdxOffset * i + 1] = 0.5;
-      initialAgentData[agentIdxOffset * i + 2] = scatterWidth + 2 * (Math.random() - 0.5);
+      initialAgentData[agentIdxOffset * i + 2] = scatterWidth * 0.5 + 2 * (Math.random() - 0.5);
 
       // color.rgba
       initialAgentData[agentIdxOffset * i + 4] = 1;
@@ -247,7 +270,7 @@ export class ComputeBufferManager {
       // position.xyz
       initialAgentData[agentIdxOffset * i + 0] = -scatterWidth * (Math.random() - 0.5);
       initialAgentData[agentIdxOffset * i + 1] = 0.5;
-      initialAgentData[agentIdxOffset * i + 2] = -scatterWidth + 2 * (Math.random() - 0.5);
+      initialAgentData[agentIdxOffset * i + 2] = -scatterWidth * 0.5 + 2 * (Math.random() - 0.5);
 
       // color.rgba
       initialAgentData[agentIdxOffset * i + 4] = 0;

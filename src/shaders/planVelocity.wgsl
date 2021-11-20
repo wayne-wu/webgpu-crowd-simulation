@@ -67,8 +67,9 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let goal = goalData.goals[idx];
 
   // a biased random velocity averaged with the agent's previous velocity
-  let randVel = vec3<f32>((rand() * 2.0) - 1.0, 0.0, (rand() * 2.0) - 1.0);
-  agent.velocity = 0.5 * (agent.velocity + (goal + randVel));
+  //let randVel = vec3<f32>((rand() * 2.0) - 1.0, 0.0, (rand() * 2.0) - 1.0);
+  //agent.velocity = 0.5 * (agent.velocity + (goal + randVel));
+  agent.velocity = 0.5 * (agent.velocity + (goal));
 
   // Store the new agent value
   agentData.agents[idx] = agent;
