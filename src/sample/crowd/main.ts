@@ -7,21 +7,12 @@ import { renderBufferManager } from './renderUtils';
 
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
-import planVelocityWGSL from '../../shaders/planVelocity.wgsl';
-import findNeighborsWGSL from '../../shaders/findNeighbors.wgsl';
-import correctPlannedVelocityWGSL from '../../shaders/correctPlannedVelocity.wgsl';
-import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.wgsl';
-import setNewPositionsWGSL from '../../shaders/setNewPositions.wgsl';
+import explicitIntegrationWGSL from '../../shaders/explicitIntegration.compute.wgsl';
+import findNeighborsWGSL from '../../shaders/findNeighbors.compute.wgsl';
+import contactSolveWGSL from '../../shaders/contactSolve.compute.wgsl';
+import constraintSolveWGSL from '../../shaders/constraintSolve.compute.wgsl';
+import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.compute.wgsl';
 
-const agentPositionOffset = 0;
-const agentColorOffset = 4 * 4;
-const agentInstanceByteSize = // number of bytes per agent
-  3 * 4 + // 3 position floats
-  1 * 4 + // lifetime
-  4 * 4 + // color
-  3 * 4 + // velocity
-  1 * 4 + // padding
-  0;
 
 let camera : Camera;
 let aspect : number;
@@ -77,7 +68,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
-  simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.01);
+  simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
   simFolder.add(simulationParams, 'numAgents', 1000, 100000, 10);
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
@@ -110,103 +101,45 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //                     Compute Buffer Setup                            //
   /////////////////////////////////////////////////////////////////////////
   var compBuffManager = new ComputeBufferManager(device, 
-                                                 simulationParams.numAgents,
-                                                 agentInstanceByteSize);
+                                                 simulationParams.numAgents);
 
   //////////////////////////////////////////////////////////////////////////
   //                Render Buffer and Pipeline Setup                      //
   //////////////////////////////////////////////////////////////////////////
   var renderBuffManager = new renderBufferManager(device, guiParams.gridWidth, 
                                                   presentationFormat, presentationSize,
-                                                  agentInstanceByteSize, agentPositionOffset, agentColorOffset);
+                                                  compBuffManager.agentInstanceSize,
+                                                  compBuffManager.agentPositionOffset, 
+                                                  compBuffManager.agentColorOffset);
 
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
   //////////////////////////////////////////////////////////////////////////////
   {
+    var computeShaders = [
+      explicitIntegrationWGSL, 
+      // findNeighborsWGSL, 
+      contactSolveWGSL, 
+      // constraintSolveWGSL, 
+      finalizeVelocityWGSL
+    ];
     var computePipelines = [];
 
-    // plan velocity:
-    // ignoring interactions, where does each agent want to go?
-    computePipelines.push( 
-        device.createComputePipeline({
-        layout: device.createPipelineLayout({
-            bindGroupLayouts: [compBuffManager.bindGroupLayout]
-        }),
-        compute: {
-          module: device.createShaderModule({
-            code: planVelocityWGSL,
+    for(let i = 0; i < computeShaders.length; i++){
+      computePipelines.push( 
+          device.createComputePipeline({
+          layout: device.createPipelineLayout({
+              bindGroupLayouts: [compBuffManager.bindGroupLayout]
           }),
-          entryPoint: 'main',
-        },
-      })
-    );
-
-
-    // find neighbors:
-    // to calculate interactions, first find which agents are near enough
-    // to interact
-    computePipelines.push( 
-      device.createComputePipeline({
-        layout: device.createPipelineLayout({
-            bindGroupLayouts: [compBuffManager.bindGroupLayout]
-        }),
-        compute: {
-          module: device.createShaderModule({
-            code: findNeighborsWGSL,
-          }),
-          entryPoint: 'main',
-        },
-      })
-    );
-
-    // correct planned velocity:
-    // iteratively refine planned next position
-    computePipelines.push( 
-      device.createComputePipeline({
-        layout: device.createPipelineLayout({
-            bindGroupLayouts: [compBuffManager.bindGroupLayout]
-        }),
-        compute: {
-          module: device.createShaderModule({
-            code: correctPlannedVelocityWGSL,
-          }),
-          entryPoint: 'main',
-        },
-      })
-    );
-
-    // finalize velocity:
-    // calc velocity based on refined plan and an XSPH viscosity component
-    computePipelines.push( 
-      device.createComputePipeline({
-        layout: device.createPipelineLayout({
-            bindGroupLayouts: [compBuffManager.bindGroupLayout]
-        }),
-        compute: {
-          module: device.createShaderModule({
-            code: finalizeVelocityWGSL,
-          }),
-          entryPoint: 'main',
-        },
-      })
-    );
-
-    // Set new positions:
-    // using the calculated velocity, update the agent to its new location
-    computePipelines.push( 
-      device.createComputePipeline({
-        layout: device.createPipelineLayout({
-            bindGroupLayouts: [compBuffManager.bindGroupLayout]
-        }),
-        compute: {
-          module: device.createShaderModule({
-            code: setNewPositionsWGSL,
-          }),
-          entryPoint: 'main',
-        },
-      })
-    );
+          compute: {
+            module: device.createShaderModule({
+              code: computeShaders[i],
+            }),
+            entryPoint: 'main',
+          },
+        })
+      );
+    }
   }
 
   // get compute bind group
@@ -331,6 +264,11 @@ const Crowd: () => JSX.Element = () =>
         name: '../../meshes/gridLines.ts',
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         contents: require('!!raw-loader!../../meshes/gridLines.ts').default,
+      },
+      {
+        name: '../../meshes/cube.ts',
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        contents: require('!!raw-loader!../../meshes/cube.ts').default,
       },
     ],
     filename: __filename,

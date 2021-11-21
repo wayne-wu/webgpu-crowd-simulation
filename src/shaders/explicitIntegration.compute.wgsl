@@ -1,6 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Utilities
 ////////////////////////////////////////////////////////////////////////////////
+let alpha : f32 = 0.05;
+
 var<private> rand_seed : vec2<f32>;
 
 fn rand() -> f32 {
@@ -18,58 +20,42 @@ fn rand() -> f32 {
 };
 
 struct Agent {
-  position : vec3<f32>;
-  lifetime : f32;
-  color    : vec4<f32>;
-  velocity : vec3<f32>;
+  x  : vec3<f32>;  // position + radius
+  r  : f32;
+  c  : vec4<f32>;  // color
+  v  : vec3<f32>;  // velocity + inverse mass
+  w  : f32;
+  xp : vec3<f32>;  // planned/predicted position
+  goal : vec3<f32>;
 };
 
 [[block]] struct Agents {
   agents : array<Agent>;
 };
 
-struct PlannedPos {
-  vel : vec2<f32>;
-};
-
-[[block]] struct PlannedPosData {
-  positions : array<PlannedPos>;
-};
-
-//struct Goal {
-//  vel : vec3<f32>;
-//};
-
-[[block]] struct GoalData {
-  goals : array<vec3<f32>>;
-};
-
-struct Cell {
-  id : u32;
-};
-
-[[block]] struct GridCells {
-  cells : array<Cell>;
-};
-
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
-[[binding(2), group(0)]] var<storage, read_write> plannedPosData : PlannedPosData;
-[[binding(3), group(0)]] var<storage, read_write> goalData : GoalData;
-[[binding(4), group(0)]] var<storage, read_write> gridCell : GridCells;
+
+fn getVelocityFromPlanner(agent : Agent) -> vec3<f32> {
+  // TODO: Implement a more complex planner
+  return normalize(agent.goal - agent.x);
+}
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
-  rand_seed = (sim_params.seed.xy + vec2<f32>(GlobalInvocationID.xy)) * sim_params.seed.zw;
+  // rand_seed = (sim_params.seed.xy + vec2<f32>(GlobalInvocationID.xy)) * sim_params.seed.zw;
 
   let idx = GlobalInvocationID.x;
   var agent = agentData.agents[idx];
-  let goal = goalData.goals[idx];
 
-  // a biased random velocity averaged with the agent's previous velocity
-  //let randVel = vec3<f32>((rand() * 2.0) - 1.0, 0.0, (rand() * 2.0) - 1.0);
-  //agent.velocity = 0.5 * (agent.velocity + (goal + randVel));
-  agent.velocity = 0.5 * (agent.velocity + (goal));
+  // velcity planning
+  var vp = getVelocityFromPlanner(agent);
+
+  // 4.1 Velocity Blending
+  agent.v = (1.0 - alpha) * agent.v + alpha * vp;
+
+  // explicit integration
+  agent.xp = agent.x + sim_params.deltaTime * agent.v;
 
   // Store the new agent value
   agentData.agents[idx] = agent;
