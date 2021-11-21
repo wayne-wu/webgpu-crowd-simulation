@@ -81,35 +81,6 @@ export class ComputeBufferManager {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // // agent goal buffer
-    // this.goalBuffer = this.device.createBuffer({
-    //   size: this.numAgents * this.goalBufferItemSize,
-    //   // use STORAGE because it's not a uniform
-    //   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    //   // note we're mapped at creation so we can initialize
-    //   // data on the CPU side
-    //   mappedAtCreation: true
-    // });
-    // this.setGoal();
-    // this.goalBuffer.unmap(); // send data/control over to GPU
-
-    // // grid cell buffer
-    // this.gridCellBuffer = this.device.createBuffer({
-    //   size: this.numAgents * this.gridCellBufferItemSize,
-    //   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    // });
-
-    // // planned position buffer
-    // this.plannedPositionBuffer = this.device.createBuffer({
-    //   size: this.numAgents * this.plannedPositionItemSize,
-    //   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    // });
-
-    // this.neighborBuffer = this.device.createBuffer({
-    //   size: this.numAgents * this.neighborBufferItemSize,
-    //   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    // });
-
     // agent buffer
     let initialAgentData = this.getAgentData(this.numAgents);
     this.agentsBuffer = this.device.createBuffer({
@@ -177,34 +148,6 @@ export class ComputeBufferManager {
           type: "storage"
         }
       },
-      // {
-      //   binding: 2, // planned position buffer
-      //   visibility: GPUShaderStage.COMPUTE,
-      //   buffer: {
-      //     type: "storage"
-      //   }
-      // },
-      // {
-      //   binding: 3, // goal buffer
-      //   visibility: GPUShaderStage.COMPUTE,
-      //   buffer: {
-      //     type: "storage"
-      //   }
-      // },
-      // {
-      //   binding: 4, // grid cell buffer
-      //   visibility: GPUShaderStage.COMPUTE,
-      //   buffer: {
-      //     type: "storage"
-      //   }
-      // },
-      // {
-      //   binding: 5, // neighbors buffer
-      //   visibility: GPUShaderStage.COMPUTE,
-      //   buffer: {
-      //     type: "storage"
-      //   }
-      // }
     ]
   });
   }
@@ -227,38 +170,6 @@ export class ComputeBufferManager {
             size: this.numAgents * this.agentInstanceSize,
           },
         },
-        // {
-        //   binding: 2,
-        //   resource: {
-        //     buffer: this.plannedPositionBuffer,
-        //     offset: 0,
-        //     size: this.numAgents * this.plannedPositionItemSize,
-        //   },
-        // },
-        // {
-        //   binding: 3,
-        //   resource: {
-        //     buffer: this.goalBuffer,
-        //     offset: 0,
-        //     size: this.numAgents * this.goalBufferItemSize,
-        //   },
-        // },
-        // {
-        //   binding: 4,
-        //   resource: {
-        //     buffer: this.gridCellBuffer,
-        //     offset: 0,
-        //     size: this.numAgents * this.gridCellBufferItemSize,
-        //   },
-        // },
-        // {
-        //   binding: 5,
-        //   resource: {
-        //     buffer: this.neighborBuffer,
-        //     offset: 0,
-        //     size: this.numAgents * this.neighborBufferItemSize,
-        //   },
-        // },
       ],
     });
     return computeBindGroup;
