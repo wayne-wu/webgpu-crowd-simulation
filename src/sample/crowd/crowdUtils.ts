@@ -1,4 +1,7 @@
 const scatterWidth = 100;
+const diskRadius = 0.5;
+const invMass = 0.0167;
+
 
 export class ComputeBufferManager {
   numAgents : number;
@@ -8,6 +11,9 @@ export class ComputeBufferManager {
 
   // buffer item sizes (for buffers that might change size)
   agentInstanceSize : number;
+  agentPositionOffset : number;
+  agentColorOffset : number;
+
   plannedPositionItemSize : number;
   goalBufferItemSize : number;
   gridCellBufferItemSize : number;
@@ -27,10 +33,24 @@ export class ComputeBufferManager {
   bindGroupLayout : GPUBindGroupLayout;
 
   constructor(device: GPUDevice, 
-              numAgents: number, 
-              agentInstanceSize : number){
+              numAgents: number){
     this.device = device;
-    this.agentInstanceSize = agentInstanceSize;
+    this.agentInstanceSize = 
+    3 * 4 + // position
+    1 * 4 + // radius
+    4 * 4 + // color
+    3 * 4 + // velocity
+    1 * 4 + // inverse mass
+    3 * 4 + // planned position
+    1 * 4 + // padding
+    3 * 4 + // goal
+    1 * 4 + // padding
+    0;
+
+    this.agentPositionOffset = 0;
+    this.agentColorOffset = 4 * 4;
+
+
     this.numAgents = numAgents;
 
 
@@ -61,34 +81,34 @@ export class ComputeBufferManager {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // agent goal buffer
-    this.goalBuffer = this.device.createBuffer({
-      size: this.numAgents * this.goalBufferItemSize,
-      // use STORAGE because it's not a uniform
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      // note we're mapped at creation so we can initialize
-      // data on the CPU side
-      mappedAtCreation: true
-    });
-    this.setGoal();
-    this.goalBuffer.unmap(); // send data/control over to GPU
+    // // agent goal buffer
+    // this.goalBuffer = this.device.createBuffer({
+    //   size: this.numAgents * this.goalBufferItemSize,
+    //   // use STORAGE because it's not a uniform
+    //   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    //   // note we're mapped at creation so we can initialize
+    //   // data on the CPU side
+    //   mappedAtCreation: true
+    // });
+    // this.setGoal();
+    // this.goalBuffer.unmap(); // send data/control over to GPU
 
-    // grid cell buffer
-    this.gridCellBuffer = this.device.createBuffer({
-      size: this.numAgents * this.gridCellBufferItemSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
+    // // grid cell buffer
+    // this.gridCellBuffer = this.device.createBuffer({
+    //   size: this.numAgents * this.gridCellBufferItemSize,
+    //   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    // });
 
-    // planned position buffer
-    this.plannedPositionBuffer = this.device.createBuffer({
-      size: this.numAgents * this.plannedPositionItemSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
+    // // planned position buffer
+    // this.plannedPositionBuffer = this.device.createBuffer({
+    //   size: this.numAgents * this.plannedPositionItemSize,
+    //   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    // });
 
-    this.neighborBuffer = this.device.createBuffer({
-      size: this.numAgents * this.neighborBufferItemSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
+    // this.neighborBuffer = this.device.createBuffer({
+    //   size: this.numAgents * this.neighborBufferItemSize,
+    //   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    // });
 
     // agent buffer
     let initialAgentData = this.getAgentData(this.numAgents);
@@ -157,34 +177,34 @@ export class ComputeBufferManager {
           type: "storage"
         }
       },
-      {
-        binding: 2, // planned position buffer
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "storage"
-        }
-      },
-      {
-        binding: 3, // goal buffer
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "storage"
-        }
-      },
-      {
-        binding: 4, // grid cell buffer
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "storage"
-        }
-      },
-      {
-        binding: 5, // neighbors buffer
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "storage"
-        }
-      }
+      // {
+      //   binding: 2, // planned position buffer
+      //   visibility: GPUShaderStage.COMPUTE,
+      //   buffer: {
+      //     type: "storage"
+      //   }
+      // },
+      // {
+      //   binding: 3, // goal buffer
+      //   visibility: GPUShaderStage.COMPUTE,
+      //   buffer: {
+      //     type: "storage"
+      //   }
+      // },
+      // {
+      //   binding: 4, // grid cell buffer
+      //   visibility: GPUShaderStage.COMPUTE,
+      //   buffer: {
+      //     type: "storage"
+      //   }
+      // },
+      // {
+      //   binding: 5, // neighbors buffer
+      //   visibility: GPUShaderStage.COMPUTE,
+      //   buffer: {
+      //     type: "storage"
+      //   }
+      // }
     ]
   });
   }
@@ -207,45 +227,45 @@ export class ComputeBufferManager {
             size: this.numAgents * this.agentInstanceSize,
           },
         },
-        {
-          binding: 2,
-          resource: {
-            buffer: this.plannedPositionBuffer,
-            offset: 0,
-            size: this.numAgents * this.plannedPositionItemSize,
-          },
-        },
-        {
-          binding: 3,
-          resource: {
-            buffer: this.goalBuffer,
-            offset: 0,
-            size: this.numAgents * this.goalBufferItemSize,
-          },
-        },
-        {
-          binding: 4,
-          resource: {
-            buffer: this.gridCellBuffer,
-            offset: 0,
-            size: this.numAgents * this.gridCellBufferItemSize,
-          },
-        },
-        {
-          binding: 5,
-          resource: {
-            buffer: this.neighborBuffer,
-            offset: 0,
-            size: this.numAgents * this.neighborBufferItemSize,
-          },
-        },
+        // {
+        //   binding: 2,
+        //   resource: {
+        //     buffer: this.plannedPositionBuffer,
+        //     offset: 0,
+        //     size: this.numAgents * this.plannedPositionItemSize,
+        //   },
+        // },
+        // {
+        //   binding: 3,
+        //   resource: {
+        //     buffer: this.goalBuffer,
+        //     offset: 0,
+        //     size: this.numAgents * this.goalBufferItemSize,
+        //   },
+        // },
+        // {
+        //   binding: 4,
+        //   resource: {
+        //     buffer: this.gridCellBuffer,
+        //     offset: 0,
+        //     size: this.numAgents * this.gridCellBufferItemSize,
+        //   },
+        // },
+        // {
+        //   binding: 5,
+        //   resource: {
+        //     buffer: this.neighborBuffer,
+        //     offset: 0,
+        //     size: this.numAgents * this.neighborBufferItemSize,
+        //   },
+        // },
       ],
     });
     return computeBindGroup;
   }
 
   getAgentData(numAgents: number){
-    const agentIdxOffset = 12;
+    const agentIdxOffset = this.agentInstanceSize / 4;
     //48 is total byte size of each agent
     const initialAgentData = new Float32Array(numAgents * agentIdxOffset);  
 
@@ -254,6 +274,9 @@ export class ComputeBufferManager {
       initialAgentData[agentIdxOffset * i + 0] = scatterWidth * (Math.random() - 0.5);
       initialAgentData[agentIdxOffset * i + 1] = 0.5;
       initialAgentData[agentIdxOffset * i + 2] = scatterWidth * 0.5 + 2 * (Math.random() - 0.5);
+
+      // radius
+      initialAgentData[agentIdxOffset * i + 3] = diskRadius;
 
       // color.rgba
       initialAgentData[agentIdxOffset * i + 4] = 1;
@@ -265,6 +288,14 @@ export class ComputeBufferManager {
       initialAgentData[agentIdxOffset * i + 8] = 0;
       initialAgentData[agentIdxOffset * i + 9] = 0;
       initialAgentData[agentIdxOffset * i + 10] = (0.1 + 0.5 * Math.random())*-1;
+
+      // inverse mass
+      initialAgentData[agentIdxOffset * i + 11] = invMass;
+
+      // goal
+      initialAgentData[agentIdxOffset * i + 16] = 0;
+      initialAgentData[agentIdxOffset * i + 17] = 0;
+      initialAgentData[agentIdxOffset * i + 18] = -scatterWidth;
     }
     for (let i = numAgents/2; i < numAgents; ++i) {
       // position.xyz
@@ -272,6 +303,9 @@ export class ComputeBufferManager {
       initialAgentData[agentIdxOffset * i + 1] = 0.5;
       initialAgentData[agentIdxOffset * i + 2] = -scatterWidth * 0.5 + 2 * (Math.random() - 0.5);
 
+      // radius
+      initialAgentData[agentIdxOffset * i + 3] = diskRadius;
+      
       // color.rgba
       initialAgentData[agentIdxOffset * i + 4] = 0;
       initialAgentData[agentIdxOffset * i + 5] = 0;
@@ -282,6 +316,13 @@ export class ComputeBufferManager {
       initialAgentData[agentIdxOffset * i + 8] = 0;
       initialAgentData[agentIdxOffset * i + 9] = 0;
       initialAgentData[agentIdxOffset * i + 10] = (0.1 + 0.5 * Math.random());
+
+      // inverse mass
+      initialAgentData[agentIdxOffset * i + 11] = invMass;
+
+      initialAgentData[agentIdxOffset * i + 16] = 0;
+      initialAgentData[agentIdxOffset * i + 17] = 0;
+      initialAgentData[agentIdxOffset * i + 18] = scatterWidth;
     }
     return initialAgentData;
   }

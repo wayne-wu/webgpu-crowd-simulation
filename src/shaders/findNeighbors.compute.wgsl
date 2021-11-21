@@ -7,10 +7,12 @@
 };
 
 struct Agent {
-  position : vec3<f32>;
-  lifetime : f32;
-  color    : vec4<f32>;
-  velocity : vec3<f32>;
+  x  : vec3<f32>;  // position + radius
+  r  : f32;
+  c  : vec4<f32>;  // color
+  v  : vec3<f32>;  // velocity + inverse mass
+  w  : f32;
+  xp : vec3<f32>;  // planned/predicted position
 };
 
 [[block]] struct Agents {
@@ -25,22 +27,13 @@ struct Goal {
   goals : array<Goal>;
 };
 
-struct Cell {
-  id : u32;
-};
-
-[[block]] struct GridCells {
-  cells : array<Cell>;
-};
-
 [[block]] struct Neighbors {
-  neighbors: array<u32>;
+  neighbors: array<u32>;  // up to 20 
 };
 
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 [[binding(2), group(0)]] var<storage, read_write> goalData : GoalData;
-[[binding(3), group(0)]] var<storage, read_write> gridCell : GridCells;
 [[binding(4), group(0)]] var<storage, read_write> neighborData : Neighbors;
 
 [[stage(compute), workgroup_size(64)]]
@@ -54,27 +47,24 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   // loop through agents, find neighbors, and save their indices to the neighbor buffer
   for (var i : u32 = 0u; i < arrayLength(&agentData.agents); i = i + 1u) {
     var potentialNeighbor = agentData.agents[i];
-    if (distance(potentialNeighbor.position, agent.position) < radius) {
-      neighborData.neighbors[neighborIdx] = i;
+    if (distance(potentialNeighbor.x, agent.x) < radius) {
+      agent.neighbors[neighborIdx] = i;
       neighborIdx = neighborIdx + 1;
-      if (idx == 0u) {
-        potentialNeighbor.color = vec4<f32>(0.0, 1.0, 0.0, 1.0);
-      }
+      // if (idx == 0u) {
+      //   potentialNeighbor.c = vec4<f32>(0.0, 1.0, 0.0, 1.0);
+      // }
     }   
   }
 
-  if (idx == 0u){
-    agent.color = vec4<f32>(0.0, 1.0, 0.0, 1.0);
-  }
-  if (distance(agent.position, agentData.agents[0].position) < radius) {
-    agent.color = vec4<f32>(0.0, 1.0, 0.0, 1.0);
-  }
-  else{
-    agent.color = vec4<f32>(0.9, 0.9, 0.9, 1.0);
-  }
-
-  // use calculated velocity to set the new position
-  //agent.position = agent.position + sim_params.deltaTime * agent.velocity;
+  // if (idx == 0u){
+  //   agent.c = vec4<f32>(0.0, 1.0, 0.0, 1.0);
+  // }
+  // if (distance(agent.x, agentData.agents[0].x) < radius) {
+  //   agent.c = vec4<f32>(0.0, 1.0, 0.0, 1.0);
+  // }
+  // else{
+  //   agent.c = vec4<f32>(0.9, 0.9, 0.9, 1.0);
+  // }
 
   // Store the new agent value
   agentData.agents[idx] = agent;
