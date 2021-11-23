@@ -1,6 +1,7 @@
 const scatterWidth = 100;
 const diskRadius = 0.5;
-const invMass = 0.0167;
+const invMass = 0.5;
+const minY = 0.5;
 
 
 export class ComputeBufferManager {
@@ -82,7 +83,8 @@ export class ComputeBufferManager {
     });
 
     // agent buffer
-    let initialAgentData = this.getAgentData(this.numAgents);
+    //let initialAgentData = this.getAgentData(this.numAgents);
+    let initialAgentData = this.initAgentsProximity(this.numAgents);
     this.agentsBuffer = this.device.createBuffer({
       size: this.numAgents * this.agentInstanceSize,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
@@ -176,64 +178,65 @@ export class ComputeBufferManager {
   }
 
   getAgentData(numAgents: number){
-    const agentIdxOffset = this.agentInstanceSize / 4;
     //48 is total byte size of each agent
-    const initialAgentData = new Float32Array(numAgents * agentIdxOffset);  
+    const initialAgentData = new Float32Array(numAgents * this.agentInstanceSize / 4);  
 
     for (let i = 0; i < numAgents/2; ++i) {
-      // position.xyz
-      initialAgentData[agentIdxOffset * i + 0] = scatterWidth * (Math.random() - 0.5);
-      initialAgentData[agentIdxOffset * i + 1] = 0.5;
-      initialAgentData[agentIdxOffset * i + 2] = scatterWidth * 0.5 + 2 * (Math.random() - 0.5);
-
-      // radius
-      initialAgentData[agentIdxOffset * i + 3] = diskRadius;
-
-      // color.rgba
-      initialAgentData[agentIdxOffset * i + 4] = 1;
-      initialAgentData[agentIdxOffset * i + 5] = 0;
-      initialAgentData[agentIdxOffset * i + 6] = 0;
-      initialAgentData[agentIdxOffset * i + 7] = 1;
-
-      // velocity.xyz
-      initialAgentData[agentIdxOffset * i + 8] = 0;
-      initialAgentData[agentIdxOffset * i + 9] = 0;
-      initialAgentData[agentIdxOffset * i + 10] = (0.1 + 0.5 * Math.random())*-1;
-
-      // inverse mass
-      initialAgentData[agentIdxOffset * i + 11] = invMass;
-
-      // goal
-      initialAgentData[agentIdxOffset * i + 16] = 0;
-      initialAgentData[agentIdxOffset * i + 17] = 0;
-      initialAgentData[agentIdxOffset * i + 18] = -scatterWidth;
+      this.setAgentData(
+        initialAgentData, i,
+        [scatterWidth * (Math.random() - 0.5), scatterWidth * 0.25 + 2 * (Math.random() - 0.5)],
+        [1,0,0,1], [0,(0.1 + 0.5 * Math.random())*-1], [0, -scatterWidth]);
     }
+
     for (let i = numAgents/2; i < numAgents; ++i) {
-      // position.xyz
-      initialAgentData[agentIdxOffset * i + 0] = -scatterWidth * (Math.random() - 0.5);
-      initialAgentData[agentIdxOffset * i + 1] = 0.5;
-      initialAgentData[agentIdxOffset * i + 2] = -scatterWidth * 0.5 + 2 * (Math.random() - 0.5);
+      this.setAgentData(
+        initialAgentData, i,
+        [-scatterWidth * (Math.random() - 0.5), -scatterWidth * 0.25 + 2 * (Math.random() - 0.5)],
+        [0,0,1,1], [0,(0.1 + 0.5 * Math.random())], [0, scatterWidth]);
+    }
 
-      // radius
-      initialAgentData[agentIdxOffset * i + 3] = diskRadius;
-      
-      // color.rgba
-      initialAgentData[agentIdxOffset * i + 4] = 0;
-      initialAgentData[agentIdxOffset * i + 5] = 0;
-      initialAgentData[agentIdxOffset * i + 6] = 1;
-      initialAgentData[agentIdxOffset * i + 7] = 1;
+    return initialAgentData;
+  }
 
-      // velocity.xyz
-      initialAgentData[agentIdxOffset * i + 8] = 0;
-      initialAgentData[agentIdxOffset * i + 9] = 0;
-      initialAgentData[agentIdxOffset * i + 10] = (0.1 + 0.5 * Math.random());
+  setAgentData(
+    agents : Float32Array, index : number, position : number[], color : number[], 
+    velocity : number[], goal : number[]) {
+    const offset = this.agentInstanceSize * index / 4;
+    
+    agents[offset + 0] = position[0];
+    agents[offset + 1] = minY;  // Force pos.y to be 0.5.
+    agents[offset + 2] = position[1];
+     
+    agents[offset + 3] = diskRadius;
 
-      // inverse mass
-      initialAgentData[agentIdxOffset * i + 11] = invMass;
+    agents[offset + 4] = color[0];
+    agents[offset + 5] = color[1];
+    agents[offset + 6] = color[2];
+    agents[offset + 7] = color[3];
 
-      initialAgentData[agentIdxOffset * i + 16] = 0;
-      initialAgentData[agentIdxOffset * i + 17] = 0;
-      initialAgentData[agentIdxOffset * i + 18] = scatterWidth;
+    agents[offset + 8] = velocity[0];
+    agents[offset + 9] = 0.0;  // Force vel-y to be 0.
+    agents[offset + 10] = velocity[1];
+
+    agents[offset + 11] = invMass;
+
+    agents[offset + 16] = goal[0];
+    agents[offset + 17] = minY;
+    agents[offset + 18] = goal[1];
+  }
+
+  initAgentsProximity(numAgents : number) {
+    const initialAgentData = new Float32Array(numAgents * this.agentInstanceSize / 4);
+    for (let i = 0; i < numAgents/2; ++i) {
+      let x = Math.floor(i/10);
+      let z = Math.floor(10+i%10);
+      let v = 0.5;
+      this.setAgentData(
+        initialAgentData, 2*i,
+        [1.25+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
+      this.setAgentData(
+        initialAgentData, 2*i + 1,
+        [-1.25+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
     }
     return initialAgentData;
   }

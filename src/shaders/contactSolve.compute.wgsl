@@ -47,33 +47,27 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
       
       // if (distance(agent_j.xp, agent.xp) > neighborRadius) { continue; }
 
-      var n3 = agent.xp - agent_j.xp;
-      var n = vec2<f32>(n3.x, n3.z);
+      var n = agent.xp - agent_j.xp;
       let d = length(n);
 
-      if (d < 1.0) {
+      let f = d - (agent.r + agent_j.r);
+      if (f < 0.0) {
         // Project Constraint
         n = normalize(n);
-        var dx = agent.w * stiffness * d * n / (agent.w + agent_j.w);
-        totalDx = totalDx + vec3<f32>(dx.x, 0.0, dx.y);
+        var dx = -1.0 * agent.w * stiffness * f * n / (agent.w + agent_j.w);
+        totalDx = totalDx + dx;
         neighborCount = neighborCount + 1;
       }
     }
 
-    // Constraint averaging: Not sure if this is needed yet
     if (neighborCount > 0) {
+      // Constraint averaging: Not sure if this is needed yet
       totalDx = (1.0/f32(neighborCount)) * totalDx; 
+      
+      // Update position with correction
+      agent.x = agent.x + totalDx;
+      agent.xp = agent.xp + totalDx;
     }
-
-    // Update position with correction
-    agent.x = agent.x + totalDx;
-    agent.xp = agent.xp + totalDx;
-    
-    // Color debugging
-    //totalDx = 0.5*normalize(totalDx) + vec3<f32>(1.0, 1.0, 1.0);
-    //agent.c.x = totalDx.x;
-    //agent.c.y = totalDx.y;
-    //agent.c.z = totalDx.z;
 
     // Store the new agent value
     agentData.agents[idx] = agent;
