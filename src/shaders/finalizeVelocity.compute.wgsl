@@ -37,18 +37,6 @@ fn getW(d : f32) -> f32 {
     }
     return w;
 }
-fn calcViscosity(agent : Agent, neighbors: array<u32, maxNeighbors> ) -> vec3<f32>{
-  var c = 217.0; // based on paper
-  var velAvg = vec3<f32>(0.0); // weighted average of all the velocity differences
-
-  for (var i : u32 = 0u; i < 20u; i = i + 1u){
-    var neighbor = agentData.agents[neighbors[0u]];
-    var d = distance(agent.x, neighbor.x);
-    var w = getW(d);
-    velAvg = velAvg + (agent.v - neighbor.v) * w;
-  }
-  return agent.v + c * velAvg;
-}
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
@@ -74,12 +62,19 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     neighbors[neighborCount] = j;
   }
   
-  // TODO: 4.3 Cohesion
-  // update velocity based on current position, corrected next position,
-  // and XSPH viscosity
-  // agent.v = calcViscosity(); // + (nextPosition - currentPosition)
-  
-  agent.v = calcViscosity(agent, neighbors);
+  // 4.3 Cohesion
+  // update velocity to factor in viscosity
+  var c = 217.0; // based on paper
+  var velAvg = vec3<f32>(0.0); // weighted average of all the velocity differences
+
+  for (var i : u32 = 0u; i < 30u; i = i + 1u){
+    var neighbor = agentData.agents[neighbors[i]];
+    var d = distance(agent.x, neighbor.x);
+    var w = getW(d);
+    velAvg = velAvg + (agent.v - neighbor.v) * w;
+  }
+  agent.v = agent.v + c * velAvg;
+  agent.v.y = 0.0;
 
   // 4.6 Maximum Speed and Acceleration Limiting
   if(length(agent.v) > maxSpeed){
