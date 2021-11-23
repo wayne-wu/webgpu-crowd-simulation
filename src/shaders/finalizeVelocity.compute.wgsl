@@ -3,7 +3,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 let maxSpeed : f32 = 2.0;
-let maxNeighbors : i32 = 30;
+let maxNeighbors : u32 = 30u;
 
 [[block]] struct SimulationParams {
   deltaTime : f32;
@@ -47,7 +47,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   agent.v = (agent.xp - agent.x)/sim_params.deltaTime;
 
   // compute neighbors
-  var neighborCount = 0;
+  var neighborCount : u32 = 0u;
   var neighbors = array<u32, maxNeighbors>();
 
   for (var j : u32 = 0u; j < arrayLength(&agentData.agents); j = j + 1u) {
@@ -58,7 +58,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     if (distance(agent_j.x, agent.x) > 1.0) { continue; }
     if (neighborCount >= maxNeighbors) { continue; }
 
-    neighborCount = neighborCount + 1;
+    neighborCount = neighborCount + 1u;
     neighbors[neighborCount] = j;
   }
   
@@ -67,9 +67,9 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   var c = 217.0; // based on paper
   var velAvg = vec3<f32>(0.0); // weighted average of all the velocity differences
 
-  for (var i : u32 = 0u; i < 30u; i = i + 1u){
+  for (var i : u32 = 0u; i < neighborCount; i = i + 1u){
     var neighbor = agentData.agents[neighbors[i]];
-    var d = distance(agent.x, neighbor.x);
+    var d = distance(agent.x, neighbor.x);  // Should this be xp or x?
     var w = getW(d);
     velAvg = velAvg + (agent.v - neighbor.v) * w;
   }

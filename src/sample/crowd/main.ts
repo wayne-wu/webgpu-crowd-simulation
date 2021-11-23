@@ -59,8 +59,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   const simulationParams = {
     simulate: true,
-    deltaTime: 0.04,
-    numAgents: 10000,
+    deltaTime: 0.02,
+    numAgents: 100,
     resetSimulation: () => { resetSim = true; }
   };
 
@@ -119,7 +119,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     var computeShaders = [
       explicitIntegrationWGSL, 
       // findNeighborsWGSL, 
-      //contactSolveWGSL, 
+      contactSolveWGSL, 
       // constraintSolveWGSL, 
       finalizeVelocityWGSL
     ];
