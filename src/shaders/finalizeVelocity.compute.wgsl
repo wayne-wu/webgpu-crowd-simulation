@@ -18,6 +18,7 @@ struct Agent {
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
   goal : vec3<f32>;
+  neighbors : array<u32, 20>; // neighbors, max 20
 };
 
 [[block]] struct Agents {
@@ -42,39 +43,24 @@ fn getW(d : f32) -> f32 {
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
   var agent = agentData.agents[idx];
+  var neighbors = agent.neighbors;
 
   // PBD: Get new velocity from corrected position
   agent.v = (agent.xp - agent.x)/sim_params.deltaTime;
 
-  // compute neighbors
-  var neighborCount = 0;
-  var neighbors = array<u32, maxNeighbors>();
-
-  for (var j : u32 = 0u; j < arrayLength(&agentData.agents); j = j + 1u) {
-    if (idx == j) { continue; }
-      
-    let agent_j = agentData.agents[j];
-      
-    if (distance(agent_j.x, agent.x) > 1.0) { continue; }
-    if (neighborCount >= maxNeighbors) { continue; }
-
-    neighborCount = neighborCount + 1;
-    neighbors[neighborCount] = j;
-  }
-  
   // 4.3 Cohesion
   // update velocity to factor in viscosity
   var c = 217.0; // based on paper
   var velAvg = vec3<f32>(0.0); // weighted average of all the velocity differences
 
-  for (var i : u32 = 0u; i < 30u; i = i + 1u){
+  for (var i : u32 = 0u; i < 20u; i = i + 1u){
     var neighbor = agentData.agents[neighbors[i]];
     var d = distance(agent.x, neighbor.x);
     var w = getW(d);
     velAvg = velAvg + (agent.v - neighbor.v) * w;
   }
   agent.v = agent.v + c * velAvg;
-  agent.v.y = 0.0;
+  agent.v.y = 0.0; // will move in the y-axis if we don't force to 0
 
   // 4.6 Maximum Speed and Acceleration Limiting
   if(length(agent.v) > maxSpeed){

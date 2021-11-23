@@ -27,6 +27,7 @@ struct Agent {
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
   goal : vec3<f32>;
+  neighbors : array<u32, 20>; // neighbors (max 20)
 };
 
 [[block]] struct Agents {
