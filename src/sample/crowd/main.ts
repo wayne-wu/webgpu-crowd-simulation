@@ -20,7 +20,7 @@ let resetSim : boolean;
 
 // Reset camera to original settings (gui function)
 function resetCameraFunc() {
-  camera = new Camera(vec3.fromValues(3, 3, 3), vec3.fromValues(0, 0, 0));
+  camera = new Camera(vec3.fromValues(50, 50, 50), vec3.fromValues(0, 0, 0));
   camera.setAspectRatio(aspect);
   camera.updateProjectionMatrix();
 }
@@ -31,7 +31,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //                       Camera Setup                                //
   ///////////////////////////////////////////////////////////////////////
 
-  camera = new Camera(vec3.fromValues(3, 3, 3), vec3.fromValues(0, 0, 0));
+  camera = new Camera(vec3.fromValues(50, 50, 50), vec3.fromValues(0, 0, 0));
   aspect = canvasRef.current.width / canvasRef.current.height;
   camera.setAspectRatio(aspect);
   camera.updateProjectionMatrix();
@@ -69,7 +69,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
-  simFolder.add(simulationParams, 'numAgents', 1000, 100000, 10);
+  simFolder.add(simulationParams, 'numAgents', 10, 100000, 10);
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
@@ -119,7 +119,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     var computeShaders = [
       explicitIntegrationWGSL, 
       // findNeighborsWGSL, 
-      contactSolveWGSL, 
+      //contactSolveWGSL, 
       // constraintSolveWGSL, 
       finalizeVelocityWGSL
     ];
