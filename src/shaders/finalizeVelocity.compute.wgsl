@@ -64,13 +64,13 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   
   // 4.3 Cohesion
   // update velocity to factor in viscosity
-  var c = 217.0; // based on paper
+  var c = 0.5; // based on paper
   var velAvg = vec3<f32>(0.0); // weighted average of all the velocity differences
 
   for (var i : u32 = 0u; i < neighborCount; i = i + 1u){
     var neighbor = agentData.agents[neighbors[i]];
-    var d = distance(agent.x, neighbor.x);  // Should this be xp or x?
-    var w = getW(d);
+    var d = distance(agent.xp, neighbor.xp);  // Should this be xp or x?
+    var w = getW(d*d);
     velAvg = velAvg + (agent.v - neighbor.v) * w;
   }
   agent.v = agent.v + c * velAvg;
