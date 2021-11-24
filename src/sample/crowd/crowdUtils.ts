@@ -15,20 +15,11 @@ export class ComputeBufferManager {
   agentPositionOffset : number;
   agentColorOffset : number;
 
-  plannedPositionItemSize : number;
-  goalBufferItemSize : number;
-  gridCellBufferItemSize : number;
-  neighborBufferItemSize : number;
-
   device : GPUDevice;
 
   // buffers
   simulationUBOBuffer : GPUBuffer;
   agentsBuffer : GPUBuffer; // data on each agent, including position, velocity, etc.
-  plannedPositionBuffer : GPUBuffer; // the position an agent will move to during this time step
-  gridCellBuffer : GPUBuffer; // the grid cell each agent belongs to
-  goalBuffer : GPUBuffer; // currently the preferred velocity, could be location sought
-  neighborBuffer : GPUBuffer; // neighbors for each agent -- max is numAgents per each agent
 
   // bind group layout
   bindGroupLayout : GPUBindGroupLayout;
@@ -46,6 +37,8 @@ export class ComputeBufferManager {
     1 * 4 + // padding
     3 * 4 + // goal
     1 * 4 + // padding
+    20 * 4 + // close neighbors
+    20 * 4 + // far neighbors
     0;
 
     this.agentPositionOffset = 0;
@@ -62,13 +55,6 @@ export class ComputeBufferManager {
       3 * 4 + // padding
       4 * 4 + // seed
       0;
-
-    // --- set item sizes (for buffers that might change size) ---
-    this.goalBufferItemSize = (3 + 1) * 4; // a vec3<f32> plus 1 byte of padding per agent
-    this.gridCellBufferItemSize = 4; // a u32 per agent
-    this.plannedPositionItemSize = 2 * 4; // a vec2<f32>
-    this.neighborBufferItemSize = 20 * 4; // max numAgents ints (neighbor indices) (had to divide by 4 or exceeds max buffer size)
-
 
     this.initBuffers();
 
@@ -112,7 +98,6 @@ export class ComputeBufferManager {
           }
     }
 
-    new Float32Array(this.goalBuffer.getMappedRange()).set(initialGoalData);
   }
 
   writeSimParams(simulationParams){

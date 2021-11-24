@@ -4,7 +4,6 @@
 let maxIterations : i32 = 6;
 let t0 : f32 = 20.0;
 let kUser : f32 = 1.0;  // TODO: User specified constant
-let neighborRadius : f32 = 5.0;
 let maxNeighborCount : i32 = 20;
 let avoidance : bool = false;
 
@@ -20,7 +19,9 @@ struct Agent {
   v  : vec3<f32>;  // velocity + inverse mass
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
-  goal: vec3<f32>;
+  goal : vec3<f32>;
+  nearNeighbors : array<u32, 20>; 
+  farNeighbors : array<u32, 20>;
 };
 
 [[block]] struct Agents {
@@ -34,34 +35,19 @@ struct Agent {
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
-  var agent = agentData.agents[idx];
-
-  var neighbors: array<u32, maxNeighborCount>;
-  
-  var i = 0;
-  for (var j : u32 = 0u; j < arrayLength(&agentData.agents); j = j + 1u) {
-      if (idx == j) { continue; }
-      
-      let agent_j = agentData.agents[j];
-      if (distance(agent.xp, agent_j.xp) < neighborRadius) {
-        neighbors[i] = j;
-        i = i + 1;
-        if(i == maxNeighborCount) { break; }
-      }
-  }
 
   // 4.4 Long Range Collision
   var itr = 0;
   loop {
     if (itr == maxIterations){ break; }
     
-    agent = agentData.agents[idx];
+    var agent = agentData.agents[idx];
     var totalDx = vec3<f32>(0.0, 0.0, 0.0);
     var neighborCount = 0;
     let dt = sim_params.deltaTime;
 
-    for (var j = 0; j < i; j = j + 1) {
-      let agent_j = agentData.agents[neighbors[j]];
+    for (var i : u32 = 0u; i < agent.farNeighbors[0]; i = i + 1u) {      
+      let agent_j = agentData.agents[agent.farNeighbors[1u+i]];
 
       let r = agent.r + agent_j.r;
       var r_sq = r * r;

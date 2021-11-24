@@ -14,6 +14,8 @@ fn rand() -> f32 {
 ////////////////////////////////////////////////////////////////////////////////
 // Simulation Compute shader
 ////////////////////////////////////////////////////////////////////////////////
+let maxNeighbors : u32 = 20u;
+
 [[block]] struct SimulationParams {
   deltaTime : f32;
   seed : vec4<f32>;
@@ -27,6 +29,8 @@ struct Agent {
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
   goal : vec3<f32>;
+  nearNeighbors : array<u32, 20>; 
+  farNeighbors : array<u32, 20>;
 };
 
 [[block]] struct Agents {
