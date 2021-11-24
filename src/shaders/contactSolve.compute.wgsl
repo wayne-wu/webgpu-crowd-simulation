@@ -54,7 +54,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
       if (f < 0.0) {
         // Project Constraint
         n = normalize(n);
-        var dx = -1.0 * agent.w * stiffness * f * n / (agent.w + agent_j.w);
+        var dx = -agent.w * stiffness * f * n / (agent.w + agent_j.w);
         totalDx = totalDx + dx;
         neighborCount = neighborCount + 1;
       }
@@ -62,7 +62,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
     if (neighborCount > 0) {
       // Constraint averaging: Not sure if this is needed yet
-      totalDx = (1.0/f32(neighborCount)) * totalDx; 
+      totalDx = totalDx / f32(neighborCount); 
       
       // Update position with correction
       agent.x = agent.x + totalDx;

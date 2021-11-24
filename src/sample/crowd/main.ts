@@ -120,7 +120,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       explicitIntegrationWGSL, 
       // findNeighborsWGSL, 
       contactSolveWGSL, 
-      // constraintSolveWGSL, 
+      constraintSolveWGSL, 
       finalizeVelocityWGSL
     ];
     var computePipelines = [];

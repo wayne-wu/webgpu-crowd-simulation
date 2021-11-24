@@ -4,6 +4,9 @@
 let maxIterations : i32 = 6;
 let t0 : f32 = 20.0;
 let kUser : f32 = 1.0;  // TODO: User specified constant
+let neighborRadius : f32 = 5.0;
+let maxNeighborCount : i32 = 20;
+let avoidance : bool = false;
 
 [[block]] struct SimulationParams {
   deltaTime : f32;
@@ -17,6 +20,7 @@ struct Agent {
   v  : vec3<f32>;  // velocity + inverse mass
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
+  goal: vec3<f32>;
 };
 
 [[block]] struct Agents {
@@ -32,38 +36,62 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
   var agent = agentData.agents[idx];
 
-  // TODO: 4.2 Friction Model (See 6.1 of https://mmacklin.com/uppfrta_preprint.pdf)
+  var neighbors: array<u32, maxNeighborCount>;
+  
+  var i = 0;
+  for (var j : u32 = 0u; j < arrayLength(&agentData.agents); j = j + 1u) {
+      if (idx == j) { continue; }
+      
+      let agent_j = agentData.agents[j];
+      if (distance(agent.xp, agent_j.xp) < neighborRadius) {
+        neighbors[i] = j;
+        i = i + 1;
+        if(i == maxNeighborCount) { break; }
+      }
+  }
 
-  // TODO: 4.4 Long Range Collision
+  // 4.4 Long Range Collision
   var itr = 0;
   loop {
     if (itr == maxIterations){ break; }
     
-    var agent = agentData.agents[idx];
+    agent = agentData.agents[idx];
     var totalDx = vec3<f32>(0.0, 0.0, 0.0);
     var neighborCount = 0;
+    let dt = sim_params.deltaTime;
 
-    for (var j : u32 = 0u; j < arrayLength(&agentData.agents); j = j + 1u) {
-      if (idx == j) { continue; }
-      
-      let agent_j = agentData.agents[j];
+    for (var j = 0; j < i; j = j + 1) {
+      let agent_j = agentData.agents[neighbors[j]];
 
-      // if (distance(agent_j.xp, agent.xp) > neighborRadius) { continue; }
-
-      let dt = sim_params.deltaTime;
       let r = agent.r + agent_j.r;
-      let dist_xp_vec = agent.xp - agent_j.xp;  // distance vector xp
-      let dist_x_vec = agent.x - agent_j.x;     // distance vector x
+      var r_sq = r * r;
 
-      let a = dot(dist_xp_vec, dist_xp_vec)/(dt*dt);
-      let b = -dot(agent.x - agent_j.x, agent.xp, agent_j.xp)/dt;
-      let c = dot(dist_x_vec, dist_x_vec) - r*r;
+      let dist = distance(agent.x, agent_j.x);
+      if (dist < r) {
+        r_sq = (r - dist) * (r - dist);
+      }
+
+      // relative displacement
+      let x_ij = agent.x - agent_j.x;
+
+      // relative velocity
+      let v_ij = (1.0/dt) * (agent.xp - agent.x - agent_j.xp + agent_j.x);
+
+      let a = dot(v_ij, v_ij);
+      let b = -dot(x_ij, v_ij);
+      let c = dot(x_ij, x_ij) - r_sq;
+      var discr = b*b - a*c;
+      if (discr <= 0.0 || abs(a) < 0.0001) { continue; }
+
+      discr = sqrt(discr);
 
       // Compute exact time to collision
-      let t = (b - sqrt(b*b - ac))/a;
+      let t1 = (b - discr)/a;
+      let t2 = (b + discr)/a;
+      var t = select(t1, t2, t2 < t1 && t2 > 0.0);
 
-      // Prune out invalid cases
-      if (t <= 0 || t >= t0) { continue; }
+      // Prune out invalid case
+      if (t < 0.0 || t > t0) { continue; }
 
       // Get time before and after collision
       let t_nocollision = dt * floor(t/dt);
@@ -71,35 +99,43 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
       // Get collision and collision-free positions
       let xi_nocollision = agent.x + t_nocollision * agent.v;
-      let xi_collision   = agent.x + t_collision * agent.v;
-      let xj_nocollision = agent_j.x + t_nocollision * agent.v;
-      let xj_collision   = agent_j.x + t_collision * agent.v;
+      var xi_collision   = agent.x + t_collision * agent.v;
+      let xj_nocollision = agent_j.x + t_nocollision * agent_j.v;
+      var xj_collision   = agent_j.x + t_collision * agent_j.v;
 
-      // Enforce collision free for x_collision using same as contactSolve
+      // Enforce collision free for x_collision using distance constraint
       var n = xi_collision - xj_collision;
       let d = length(n);
 
-      if (d < agent.r + agent_j.r) {
-        // Project Constraint
+      let f = d - r;
+      if (f < 0.0) {
         n = normalize(n);
-        var dx = -agent.w * d * n / (agent.w + agent_j.w);
+        //var k = kUser * exp(-t_nocollision*t_nocollision/t0);
+
+        var k = 0.05;
+        k = 1.0 - pow(1.0 - k, 1.0/(f32(itr + 1)));
+        var dx = -agent.w * k * f * n / (agent.w + agent_j.w);
+
+        // 4.5 Avoidance Model
+        if (avoidance) {
+          xi_collision = xi_collision + dx;
+          xj_collision = xj_collision - dx;
+
+          let d_vec = (xi_collision - xi_nocollision) - (xj_collision - xj_nocollision);
+          let n_contact = normalize(xi_collision - xj_collision);
+          dx = d_vec - dot(d_vec, n_contact)*n_contact;
+        }
+
+        // TODO: 4.2 Friction Model (See 6.1 of https://mmacklin.com/uppfrta_preprint.pdf)
         totalDx = totalDx + dx;
         neighborCount = neighborCount + 1;
       }
-
-      // TODO: 4.5 Avoidance Model
-      // let d = (xi_collision - xi_nocollision) - (xj_collision - xj_nocollision);
-      // let n = normalize(xi_nocollision - xj_nocollision);
-      // let dt = d - dot(d,n)*n;
-      // dx = dx in dt direction (tangential component only)
     }
 
-    var stiffness = k * exp(-t_nocollision*t_nocollision/t0)
-    // Constraint averaging: Not sure if this is needed yet
-    totalDx = (1.0/f32(neighborCount)) * stiffness * totalDx; 
-
-    // Update position with correction
-    agent.xp = agent.xp + totalDx;
+    if (neighborCount > 0) {
+      // Update position with correction
+      agent.xp = agent.xp + totalDx / f32(neighborCount);
+    }
 
     // Store the new agent value
     agentData.agents[idx] = agent;
@@ -110,8 +146,4 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
     itr = itr + 1;
   }
-
-  // Store the new agent value
-  // TODO uncomment this to actually set the velocity of our local agent
-  // agentData.agents[idx] = agent;
 }
