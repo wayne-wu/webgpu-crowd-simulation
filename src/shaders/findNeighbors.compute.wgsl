@@ -1,14 +1,10 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Simulation Compute shader
+// Finding Neighboring Agents Compute Shader
 ////////////////////////////////////////////////////////////////////////////////
+
 let maxNeighbors : u32 = 20u;
 let nearRadius : f32 = 2.0;
 let farRadius : f32 = 5.0;
-
-[[block]] struct SimulationParams {
-  deltaTime : f32;
-  seed : vec4<f32>;
-};
 
 struct Agent {
   x  : vec3<f32>;  // position + radius
@@ -26,7 +22,6 @@ struct Agent {
   agents : array<Agent>;
 };
 
-[[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 
 [[stage(compute), workgroup_size(64)]]

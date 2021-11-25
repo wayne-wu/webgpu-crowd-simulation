@@ -1,11 +1,14 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Simulation Compute shader
+// Stability Solve & Short Range Collision 
 ////////////////////////////////////////////////////////////////////////////////
-let maxIterations : i32 = 1;
-let stiffness : f32 = 1.0;
+
+let maxIterations : i32 = 1;  // paper = 1
+let stiffness : f32 = 1.0;  // paper = 1.0 [0,1]
+let avgCoefficient : f32 = 1.2;  // paper = 1.2 [1,2]
 
 [[block]] struct SimulationParams {
   deltaTime : f32;
+  avoidance : i32;
   seed : vec4<f32>;
 };
 
@@ -59,7 +62,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
     if (neighborCount > 0) {
       // Constraint averaging: Not sure if this is needed yet
-      totalDx = totalDx / f32(neighborCount); 
+      totalDx = avgCoefficient * totalDx / f32(neighborCount); 
       
       // Update position with correction
       agent.x = agent.x + totalDx;

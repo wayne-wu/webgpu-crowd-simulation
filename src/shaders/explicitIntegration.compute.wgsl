@@ -1,23 +1,15 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Utilities
+// Explicit Integration for Advecting the Agents
 ////////////////////////////////////////////////////////////////////////////////
-let alpha : f32 = 0.05;
 
-var<private> rand_seed : vec2<f32>;
+let ksi : f32 = 0.05;  // paper = 0.0385
+let preferredVelocity : f32 = 1.4; // paper = 1.4
 
-fn rand() -> f32 {
-    rand_seed.x = fract(cos(dot(rand_seed, vec2<f32>(23.14077926, 232.61690225))) * 136.8168);
-    rand_seed.y = fract(cos(dot(rand_seed, vec2<f32>(54.47856553, 345.84153136))) * 534.7645);
-    return rand_seed.y;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Simulation Compute shader
-////////////////////////////////////////////////////////////////////////////////
 let maxNeighbors : u32 = 20u;
 
 [[block]] struct SimulationParams {
   deltaTime : f32;
+  avoidance : i32;
   seed : vec4<f32>;
 };
 
@@ -42,12 +34,11 @@ struct Agent {
 
 fn getVelocityFromPlanner(agent : Agent) -> vec3<f32> {
   // TODO: Implement a more complex planner
-  return normalize(agent.goal - agent.x);
+  return normalize(agent.goal - agent.x) * preferredVelocity;
 }
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
-  // rand_seed = (sim_params.seed.xy + vec2<f32>(GlobalInvocationID.xy)) * sim_params.seed.zw;
 
   let idx = GlobalInvocationID.x;
   var agent = agentData.agents[idx];
@@ -56,7 +47,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   var vp = getVelocityFromPlanner(agent);
 
   // 4.1 Velocity Blending
-  agent.v = (1.0 - alpha) * agent.v + alpha * vp;
+  agent.v = (1.0 - ksi) * agent.v + ksi * vp;
 
   // explicit integration
   agent.xp = agent.x + sim_params.deltaTime * agent.v;
