@@ -25,11 +25,6 @@ struct Agent {
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 
-fn getVelocityFromPlanner(agent : Agent) -> vec3<f32> {
-  // TODO: Implement a more complex planner
-  return normalize(agent.goal - agent.x);
-}
-
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   // rand_seed = (sim_params.seed.xy + vec2<f32>(GlobalInvocationID.xy)) * sim_params.seed.zw;
