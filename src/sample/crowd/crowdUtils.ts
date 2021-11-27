@@ -14,15 +14,22 @@ export class ComputeBufferManager {
   agentInstanceSize : number;
   agentPositionOffset : number;
   agentColorOffset : number;
+  sortedAgentInstanceSize : number;
+  cellInstanceSize : number;
 
   device : GPUDevice;
 
   // buffers
   simulationUBOBuffer : GPUBuffer;
-  agentsBuffer : GPUBuffer; // data on each agent, including position, velocity, etc.
+  agentsBuffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
+  sortedAgentsBuffer : GPUBuffer;     // sorted agents (temp buffer for hash grid sorting)
+  cellsBuffer : GPUBuffer;            // start / end indices for each cell (in pairs)
 
   // bind group layout
   bindGroupLayout : GPUBindGroupLayout;
+
+  gridWidth : number;
+  gridHeight : number;
 
   constructor(device: GPUDevice, 
               numAgents: number){
@@ -54,6 +61,17 @@ export class ComputeBufferManager {
       4 * 4 + // seed
       0;
 
+    this.sortedAgentInstanceSize = 
+      1 * 4   // u32 representing agent index
+    ;
+
+    this.cellInstanceSize = 
+      2 * 4   // 2 u32 indices per pair of start/end ptrs
+    ;
+
+    this.gridWidth = 100;
+    this.gridHeight = 50;
+
     this.initBuffers();
 
     this.setBindGroupLayout();
@@ -78,6 +96,26 @@ export class ComputeBufferManager {
       initialAgentData
     );
     this.agentsBuffer.unmap(); 
+
+     // sorted agent buffer
+    let initialSortedAgentData = new Float32Array(this.numAgents);
+    initialSortedAgentData.map((val, i) => i); // map each agent to its index
+
+    this.sortedAgentsBuffer = this.device.createBuffer({
+      size: this.numAgents * this.sortedAgentInstanceSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true
+    });
+    new Float32Array(this.sortedAgentsBuffer.getMappedRange()).set(
+      initialSortedAgentData
+    );
+    this.sortedAgentsBuffer.unmap(); 
+ 
+     this.cellsBuffer = this.device.createBuffer({
+       size: this.gridWidth * this.gridHeight * this.cellInstanceSize,
+       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+       mappedAtCreation: false
+     });
   }
 
   setGoal(){
@@ -133,6 +171,20 @@ export class ComputeBufferManager {
           type: "storage"
         }
       },
+      {
+        binding: 2, // sortedAgentsBuffer
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage"
+        }
+      },
+      {
+        binding: 3, // cellsBuffer
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage"
+        }
+      },
     ]
   });
   }
@@ -153,6 +205,22 @@ export class ComputeBufferManager {
             buffer: this.agentsBuffer,
             offset: 0,
             size: this.numAgents * this.agentInstanceSize,
+          },
+        },
+        {
+          binding: 2,
+          resource: {
+            buffer: this.sortedAgentsBuffer,
+            offset: 0,
+            size: this.numAgents * this.sortedAgentInstanceSize,
+          },
+        },
+        {
+          binding: 3,
+          resource: {
+            buffer: this.cellsBuffer,
+            offset: 0,
+            size: this.gridWidth * this.gridHeight * this.cellInstanceSize,
           },
         },
       ],
