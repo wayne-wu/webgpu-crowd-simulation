@@ -8,6 +8,7 @@ import { renderBufferManager } from './renderUtils';
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
 import explicitIntegrationWGSL from '../../shaders/explicitIntegration.compute.wgsl';
+import assignCellsWGSL from '../../shaders/assignCells.compute.wgsl';
 import findNeighborsWGSL from '../../shaders/findNeighbors.compute.wgsl';
 import contactSolveWGSL from '../../shaders/contactSolve.compute.wgsl';
 import constraintSolveWGSL from '../../shaders/constraintSolve.compute.wgsl';
@@ -117,7 +118,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //////////////////////////////////////////////////////////////////////////////
   {
     var computeShaders = [
-      explicitIntegrationWGSL, 
+      explicitIntegrationWGSL,
+      assignCellsWGSL, 
       // findNeighborsWGSL, 
       contactSolveWGSL, 
       //constraintSolveWGSL, 

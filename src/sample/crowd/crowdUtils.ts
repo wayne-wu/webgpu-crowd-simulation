@@ -254,7 +254,7 @@ export class ComputeBufferManager {
     velocity : number[], goal : number[]) {
     const offset = this.agentInstanceSize * index / 4;
     
-    agents[offset + 0] = position[0];
+    agents[offset + 0] = position[0] - 60.0;
     agents[offset + 1] = minY;  // Force pos.y to be 0.5.
     agents[offset + 2] = position[1];
      
