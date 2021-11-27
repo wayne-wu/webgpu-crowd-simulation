@@ -18,6 +18,7 @@ struct Agent {
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
   goal : vec3<f32>;
+  cell : u32;      // grid cell (linear form)
 };
 
 [[block]] struct Agents {
