@@ -6,6 +6,7 @@ const minY = 0.5;
 
 export class ComputeBufferManager {
   numAgents : number;
+  numAgentsPadded : number;
 
   // buffer sizes
   simulationUBOBufferSize : number;
@@ -14,7 +15,7 @@ export class ComputeBufferManager {
   agentInstanceSize : number;
   agentPositionOffset : number;
   agentColorOffset : number;
-  sortedAgentInstanceSize : number;
+  agentSortProxySize : number;
   cellInstanceSize : number;
 
   device : GPUDevice;
@@ -22,7 +23,7 @@ export class ComputeBufferManager {
   // buffers
   simulationUBOBuffer : GPUBuffer;
   agentsBuffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
-  sortedAgentsBuffer : GPUBuffer;     // sorted agents (temp buffer for hash grid sorting)
+  agentSortProxyBuffer : GPUBuffer;     // sorted agents (temp buffer for hash grid sorting)
   cellsBuffer : GPUBuffer;            // start / end indices for each cell (in pairs)
 
   // bind group layout
@@ -54,6 +55,10 @@ export class ComputeBufferManager {
 
     this.numAgents = numAgents;
 
+    // bitonic sort requires input of length 2^n so we'll 
+    // need a buffer of this size
+    this.numAgentsPadded = Math.pow(2,Math.ceil(Math.log2(numAgents)));
+
 
     // --- set buffer sizes ---
 
@@ -61,11 +66,16 @@ export class ComputeBufferManager {
       1 * 4 + // deltaTime
       3 * 4 + // padding
       4 * 4 + // seed
+      1 * 4 + // numAgents
+      3 * 4 + // padding
+      1 * 4 + // agentPadding
       0;
 
-    this.sortedAgentInstanceSize = 
-      1 * 4   // u32 representing agent index
-    ;
+    this.agentSortProxySize = 
+      1 * 4 + // u32 representing agent index
+      3 * 4 + // padding
+      1 * 4 + // u32 representing agent cell
+      0;
 
     this.cellInstanceSize = 
       2 * 4   // 2 u32 indices per pair of start/end ptrs
@@ -100,18 +110,25 @@ export class ComputeBufferManager {
     this.agentsBuffer.unmap(); 
 
      // sorted agent buffer
-    let initialSortedAgentData = new Float32Array(this.numAgents);
-    initialSortedAgentData.map((val, i) => i); // map each agent to its index
+    //let initialSortedAgentData = new Float32Array(this.numAgents);
+    //initialSortedAgentData.map((val, i) => i); // map each agent to its index
 
-    this.sortedAgentsBuffer = this.device.createBuffer({
-      size: this.numAgents * this.sortedAgentInstanceSize,
+    this.agentSortProxyBuffer = this.device.createBuffer({
+      size: this.numAgentsPadded * this.agentInstanceSize,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true
     });
-    new Float32Array(this.sortedAgentsBuffer.getMappedRange()).set(
-      initialSortedAgentData
+    //new Float32Array(this.agentSortProxyBuffer.getMappedRange()).set(
+    //  initialSortedAgentData
+    //);
+    // initialize paddedAgentData with all -1s. valid indices will be overwritten
+    // with proper agent data, then it will all be sorted. 
+    let paddedAgentData = new Float32Array(this.numAgentsPadded).fill(-1); 
+    //paddedAgentData.set(initialAgentData);
+    new Float32Array(this.agentsBuffer.getMappedRange()).set(
+      paddedAgentData
     );
-    this.sortedAgentsBuffer.unmap(); 
+    this.agentSortProxyBuffer.unmap(); 
  
      this.cellsBuffer = this.device.createBuffer({
        size: this.gridWidth * this.gridHeight * this.cellInstanceSize,
@@ -174,7 +191,7 @@ export class ComputeBufferManager {
         }
       },
       {
-        binding: 2, // sortedAgentsBuffer
+        binding: 2, // agentSortProxyBuffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
@@ -212,9 +229,9 @@ export class ComputeBufferManager {
         {
           binding: 2,
           resource: {
-            buffer: this.sortedAgentsBuffer,
+            buffer: this.agentSortProxyBuffer,
             offset: 0,
-            size: this.numAgents * this.sortedAgentInstanceSize,
+            size: this.numAgentsPadded * this.agentInstanceSize,
           },
         },
         {
@@ -294,29 +311,29 @@ export class ComputeBufferManager {
     return initialAgentData;
   }
 
-async readAgent(commandEncoder, i : number){
-    // Get a GPU buffer for reading in an unmapped state.
-    const gpuReadBuffer = this.device.createBuffer({
-      size: this.agentInstanceSize,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-    });
-  
-    // Encode commands for copying buffer to buffer.
-    commandEncoder.copyBufferToBuffer(
-      this.agentsBuffer, // source buffer
-      0, // source offset
-      gpuReadBuffer, // destination buffer
-      0, // destination offset
-      this.agentInstanceSize // size
-    );
-  
-    // Submit GPU commands.
-    const gpuCommands = commandEncoder.finish();
-    this.device.queue.submit([gpuCommands]);
-  
-    // Read buffer.
-    await gpuReadBuffer.mapAsync(GPUMapMode.READ);
-    const arrayBuffer = gpuReadBuffer.getMappedRange();
-    console.log(new Float32Array(arrayBuffer));
-}
+//async readAgent(commandEncoder, i : number){
+//    // Get a GPU buffer for reading in an unmapped state.
+//    const gpuReadBuffer = this.device.createBuffer({
+//      size: this.agentInstanceSize,
+//      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+//    });
+//  
+//    // Encode commands for copying buffer to buffer.
+//    commandEncoder.copyBufferToBuffer(
+//      this.agentsBuffer, // source buffer
+//      0, // source offset
+//      gpuReadBuffer, // destination buffer
+//      0, // destination offset
+//      this.agentInstanceSize // size
+//    );
+//  
+//    // Submit GPU commands.
+//    const gpuCommands = commandEncoder.finish();
+//    this.device.queue.submit([gpuCommands]);
+//  
+//    // Read buffer.
+//    await gpuReadBuffer.mapAsync(GPUMapMode.READ);
+//    const arrayBuffer = gpuReadBuffer.getMappedRange();
+//    console.log(new Float32Array(arrayBuffer));
+//}
 }
