@@ -273,7 +273,7 @@ export class ComputeBufferManager {
      
     agents[offset + 3] = diskRadius;
 
-    agents[offset + 4] = color[0];
+    agents[offset + 4] = Math.random(); //color[0];
     agents[offset + 5] = color[1];
     agents[offset + 6] = color[2];
     agents[offset + 7] = color[3];
