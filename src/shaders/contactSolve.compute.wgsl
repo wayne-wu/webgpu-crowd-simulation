@@ -2,7 +2,6 @@
 // Simulation Compute shader
 ////////////////////////////////////////////////////////////////////////////////
 let maxIterations : i32 = 1;
-let neighborRadius : f32 = 5.0;
 let stiffness : f32 = 1.0;
 
 [[block]] struct SimulationParams {
@@ -17,7 +16,9 @@ struct Agent {
   v  : vec3<f32>;  // velocity + inverse mass
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
-  goal: vec3<f32>;
+  goal : vec3<f32>;
+  nearNeighbors : array<u32, 20>; 
+  farNeighbors : array<u32, 20>;
 };
 
 [[block]] struct Agents {
@@ -40,12 +41,8 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     var totalDx = vec3<f32>(0.0, 0.0, 0.0);
     var neighborCount = 0;
 
-    for (var j : u32 = 0u; j < arrayLength(&agentData.agents); j = j + 1u) {
-      if (idx == j) { continue; }
-      
-      let agent_j = agentData.agents[j];
-      
-      // if (distance(agent_j.xp, agent.xp) > neighborRadius) { continue; }
+    for (var i : u32 = 0u; i < agent.nearNeighbors[0]; i = i + 1u) {      
+      let agent_j = agentData.agents[agent.nearNeighbors[1u+i]];
 
       var n = agent.xp - agent_j.xp;
       let d = length(n);

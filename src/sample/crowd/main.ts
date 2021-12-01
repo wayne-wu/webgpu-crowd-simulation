@@ -118,7 +118,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   {
     var computeShaders = [
       explicitIntegrationWGSL, 
-      // findNeighborsWGSL, 
+      findNeighborsWGSL, 
       contactSolveWGSL, 
       constraintSolveWGSL, 
       finalizeVelocityWGSL
