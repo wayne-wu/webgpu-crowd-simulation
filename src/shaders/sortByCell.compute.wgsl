@@ -117,7 +117,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   var agent = agentData.agents[idx];
 
   
-  var i : u32;
+  var i : u32 = idx;
   var j : u32;
   var k : u32;
   var l : u32;
@@ -130,16 +130,13 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   // all indices run from 0 to n-1
   for (k = 2u; k <= n; k = k * 2u){ // k is doubled every iteration
     for (j = k/2u; j > 0u; j = j / 2u){ // j is halved at every iteration, with truncation of fractional parts
-      //for (i = 0u; i < n; i = i + 1u){
-        i = idx;
         l = i ^ j; 
         if (l > i){
           if (  (i & k) == 0u && agentgt(i,l) || (i & k) != 0u && agentlt(i, l)){
-            swap(i, l);
-            //storageBarrier();
+           swap(i, l);
+           storageBarrier();
           }
         }
-      //}
     }
   }
 }
