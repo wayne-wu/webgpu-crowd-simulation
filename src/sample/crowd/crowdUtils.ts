@@ -1,4 +1,8 @@
 const scatterWidth = 100;
+const diskRadius = 0.5;
+const invMass = 0.5;
+const minY = 0.5;
+
 
 export class ComputeBufferManager {
   numAgents : number;
@@ -8,29 +12,39 @@ export class ComputeBufferManager {
 
   // buffer item sizes (for buffers that might change size)
   agentInstanceSize : number;
-  plannedPositionItemSize : number;
-  goalBufferItemSize : number;
-  gridCellBufferItemSize : number;
-  neighborBufferItemSize : number;
+  agentPositionOffset : number;
+  agentColorOffset : number;
 
   device : GPUDevice;
 
   // buffers
   simulationUBOBuffer : GPUBuffer;
   agentsBuffer : GPUBuffer; // data on each agent, including position, velocity, etc.
-  plannedPositionBuffer : GPUBuffer; // the position an agent will move to during this time step
-  gridCellBuffer : GPUBuffer; // the grid cell each agent belongs to
-  goalBuffer : GPUBuffer; // currently the preferred velocity, could be location sought
-  neighborBuffer : GPUBuffer; // neighbors for each agent -- max is numAgents per each agent
 
   // bind group layout
   bindGroupLayout : GPUBindGroupLayout;
 
   constructor(device: GPUDevice, 
-              numAgents: number, 
-              agentInstanceSize : number){
+              numAgents: number){
     this.device = device;
-    this.agentInstanceSize = agentInstanceSize;
+    this.agentInstanceSize = 
+    3 * 4 + // position
+    1 * 4 + // radius
+    4 * 4 + // color
+    3 * 4 + // velocity
+    1 * 4 + // inverse mass
+    3 * 4 + // planned position
+    1 * 4 + // padding
+    3 * 4 + // goal
+    1 * 4 + // padding
+    20 * 4 + // close neighbors
+    20 * 4 + // far neighbors
+    0;
+
+    this.agentPositionOffset = 0;
+    this.agentColorOffset = 4 * 4;
+
+
     this.numAgents = numAgents;
 
 
@@ -41,13 +55,6 @@ export class ComputeBufferManager {
       3 * 4 + // padding
       4 * 4 + // seed
       0;
-
-    // --- set item sizes (for buffers that might change size) ---
-    this.goalBufferItemSize = (3 + 1) * 4; // a vec3<f32> plus 1 byte of padding per agent
-    this.gridCellBufferItemSize = 4; // a u32 per agent
-    this.plannedPositionItemSize = 2 * 4; // a vec2<f32>
-    this.neighborBufferItemSize = 20 * 4; // max numAgents ints (neighbor indices) (had to divide by 4 or exceeds max buffer size)
-
 
     this.initBuffers();
 
@@ -61,37 +68,9 @@ export class ComputeBufferManager {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // agent goal buffer
-    this.goalBuffer = this.device.createBuffer({
-      size: this.numAgents * this.goalBufferItemSize,
-      // use STORAGE because it's not a uniform
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      // note we're mapped at creation so we can initialize
-      // data on the CPU side
-      mappedAtCreation: true
-    });
-    this.setGoal();
-    this.goalBuffer.unmap(); // send data/control over to GPU
-
-    // grid cell buffer
-    this.gridCellBuffer = this.device.createBuffer({
-      size: this.numAgents * this.gridCellBufferItemSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-
-    // planned position buffer
-    this.plannedPositionBuffer = this.device.createBuffer({
-      size: this.numAgents * this.plannedPositionItemSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-
-    this.neighborBuffer = this.device.createBuffer({
-      size: this.numAgents * this.neighborBufferItemSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-
     // agent buffer
-    let initialAgentData = this.getAgentData(this.numAgents);
+    //let initialAgentData = this.getAgentData(this.numAgents);
+    let initialAgentData = this.initAgentsProximity(this.numAgents);
     this.agentsBuffer = this.device.createBuffer({
       size: this.numAgents * this.agentInstanceSize,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
@@ -119,7 +98,6 @@ export class ComputeBufferManager {
           }
     }
 
-    new Float32Array(this.goalBuffer.getMappedRange()).set(initialGoalData);
   }
 
   writeSimParams(simulationParams){
@@ -157,34 +135,6 @@ export class ComputeBufferManager {
           type: "storage"
         }
       },
-      {
-        binding: 2, // planned position buffer
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "storage"
-        }
-      },
-      {
-        binding: 3, // goal buffer
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "storage"
-        }
-      },
-      {
-        binding: 4, // grid cell buffer
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "storage"
-        }
-      },
-      {
-        binding: 5, // neighbors buffer
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "storage"
-        }
-      }
     ]
   });
   }
@@ -207,81 +157,71 @@ export class ComputeBufferManager {
             size: this.numAgents * this.agentInstanceSize,
           },
         },
-        {
-          binding: 2,
-          resource: {
-            buffer: this.plannedPositionBuffer,
-            offset: 0,
-            size: this.numAgents * this.plannedPositionItemSize,
-          },
-        },
-        {
-          binding: 3,
-          resource: {
-            buffer: this.goalBuffer,
-            offset: 0,
-            size: this.numAgents * this.goalBufferItemSize,
-          },
-        },
-        {
-          binding: 4,
-          resource: {
-            buffer: this.gridCellBuffer,
-            offset: 0,
-            size: this.numAgents * this.gridCellBufferItemSize,
-          },
-        },
-        {
-          binding: 5,
-          resource: {
-            buffer: this.neighborBuffer,
-            offset: 0,
-            size: this.numAgents * this.neighborBufferItemSize,
-          },
-        },
       ],
     });
     return computeBindGroup;
   }
 
   getAgentData(numAgents: number){
-    const agentIdxOffset = 12;
     //48 is total byte size of each agent
-    const initialAgentData = new Float32Array(numAgents * agentIdxOffset);  
+    const initialAgentData = new Float32Array(numAgents * this.agentInstanceSize / 4);  
 
     for (let i = 0; i < numAgents/2; ++i) {
-      // position.xyz
-      initialAgentData[agentIdxOffset * i + 0] = scatterWidth * (Math.random() - 0.5);
-      initialAgentData[agentIdxOffset * i + 1] = 0.5;
-      initialAgentData[agentIdxOffset * i + 2] = scatterWidth * 0.5 + 2 * (Math.random() - 0.5);
-
-      // color.rgba
-      initialAgentData[agentIdxOffset * i + 4] = 1;
-      initialAgentData[agentIdxOffset * i + 5] = 0;
-      initialAgentData[agentIdxOffset * i + 6] = 0;
-      initialAgentData[agentIdxOffset * i + 7] = 1;
-
-      // velocity.xyz
-      initialAgentData[agentIdxOffset * i + 8] = 0;
-      initialAgentData[agentIdxOffset * i + 9] = 0;
-      initialAgentData[agentIdxOffset * i + 10] = (0.1 + 0.5 * Math.random())*-1;
+      this.setAgentData(
+        initialAgentData, i,
+        [scatterWidth * (Math.random() - 0.5), scatterWidth * 0.25 + 2 * (Math.random() - 0.5)],
+        [1,0,0,1], [0,(0.1 + 0.5 * Math.random())*-1], [0, -scatterWidth]);
     }
+
     for (let i = numAgents/2; i < numAgents; ++i) {
-      // position.xyz
-      initialAgentData[agentIdxOffset * i + 0] = -scatterWidth * (Math.random() - 0.5);
-      initialAgentData[agentIdxOffset * i + 1] = 0.5;
-      initialAgentData[agentIdxOffset * i + 2] = -scatterWidth * 0.5 + 2 * (Math.random() - 0.5);
+      this.setAgentData(
+        initialAgentData, i,
+        [-scatterWidth * (Math.random() - 0.5), -scatterWidth * 0.25 + 2 * (Math.random() - 0.5)],
+        [0,0,1,1], [0,(0.1 + 0.5 * Math.random())], [0, scatterWidth]);
+    }
 
-      // color.rgba
-      initialAgentData[agentIdxOffset * i + 4] = 0;
-      initialAgentData[agentIdxOffset * i + 5] = 0;
-      initialAgentData[agentIdxOffset * i + 6] = 1;
-      initialAgentData[agentIdxOffset * i + 7] = 1;
+    return initialAgentData;
+  }
 
-      // velocity.xyz
-      initialAgentData[agentIdxOffset * i + 8] = 0;
-      initialAgentData[agentIdxOffset * i + 9] = 0;
-      initialAgentData[agentIdxOffset * i + 10] = (0.1 + 0.5 * Math.random());
+  setAgentData(
+    agents : Float32Array, index : number, position : number[], color : number[], 
+    velocity : number[], goal : number[]) {
+    const offset = this.agentInstanceSize * index / 4;
+    
+    agents[offset + 0] = position[0];
+    agents[offset + 1] = minY;  // Force pos.y to be 0.5.
+    agents[offset + 2] = position[1];
+     
+    agents[offset + 3] = diskRadius;
+
+    agents[offset + 4] = color[0];
+    agents[offset + 5] = color[1];
+    agents[offset + 6] = color[2];
+    agents[offset + 7] = color[3];
+
+    agents[offset + 8] = velocity[0];
+    agents[offset + 9] = 0.0;  // Force vel-y to be 0.
+    agents[offset + 10] = velocity[1];
+
+    agents[offset + 11] = invMass;
+
+    agents[offset + 16] = goal[0];
+    agents[offset + 17] = minY;
+    agents[offset + 18] = goal[1];
+  }
+
+  initAgentsProximity(numAgents : number) {
+    const initialAgentData = new Float32Array(numAgents * this.agentInstanceSize / 4);
+    for (let i = 0; i < numAgents/2; ++i) {
+      let x = Math.floor(i/10);
+      let z = Math.floor(10+i%10);
+      let v = 0.5;
+      this.setAgentData(
+        initialAgentData, 2*i,
+        [1.25+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
+      this.setAgentData(
+        initialAgentData, 2*i + 1,
+        [-1.25+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
     }
     return initialAgentData;
   }
