@@ -1,5 +1,11 @@
 # Real-Time Crowd Simulation in WebGPU
-A project by Ashley Alexander-Lee, Matt Elser, and Wayne Wu.
+
+**University of Pennsylvania, CIS 565: GPU Programming and Architecture, Final Project**
+
+by [Ashley Alexander-Lee](), [Matt Elser](), and [Wayne Wu](www.wuwayne.com).
+
+## Overview
+Based on: [Position-Based Real-Time Simulation of Large Crowds](https://tomerwei.github.io/pdfs/mig2017.pdf).
 
 ![Real-Time Crowd Simulation GIF](img/milestone1_progress.gif)
 
