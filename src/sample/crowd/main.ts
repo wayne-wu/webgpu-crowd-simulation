@@ -25,6 +25,98 @@ function resetCameraFunc() {
   camera.updateProjectionMatrix();
 }
 
+
+function getSortStepWGSL(numAgents : number, k : number, j : number, ){
+  // bitonic sort as I understand it requires a device-wide join after every "step" to avoid
+  // race conditions. The least gross way I can think to do that is to create a new pipeline
+  // for each step.
+  let baseWGSL = `
+  struct Agent {
+    x  : vec3<f32>;  // position + radius
+    r  : f32;
+    c  : vec4<f32>;  // color
+    v  : vec3<f32>;  // velocity + inverse mass
+    w  : f32;
+    xp : vec3<f32>;  // planned/predicted position
+    goal: vec3<f32>;
+    cell : u32;      // grid cell (linear form)
+    nearNeighbors : array<u32, 20>; 
+    farNeighbors : array<u32, 20>;
+  };
+
+  [[block]] struct Agents {
+    agents : array<Agent>;
+  };
+
+  [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
+
+  fn swap(idx1 : u32, idx2 : u32) {
+    //var tmp = agentData.agents[idx1];
+    //agentData.agents[idx1] = agentData.agents[idx2];
+    //agentData.agents[idx2] = tmp; 
+    var tmp = agentData.agents[idx1].c[0];
+    agentData.agents[idx1].c[0] = agentData.agents[idx2].c[0];
+    agentData.agents[idx2].c[0] = tmp; 
+  }
+
+  fn agentlt(idx1 : u32, idx2 : u32) -> bool {
+    //return agentData.agents[idx1].cell < agentData.agents[idx2].cell;
+    return agentData.agents[idx1].c[0] < agentData.agents[idx2].c[0];
+  }
+
+  fn agentgt(idx1 : u32, idx2 : u32) -> bool {
+    //return agentData.agents[idx1].cell > agentData.agents[idx2].cell;
+    return agentData.agents[idx1].c[0] > agentData.agents[idx2].c[0];
+  }
+
+  [[stage(compute), workgroup_size(256)]]
+  fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
+    let idx = GlobalInvocationID.x ;
+    var agent = agentData.agents[idx];
+    
+    var j : u32 = ${j}u;
+    var k : u32 = ${k}u;
+    var l = idx ^ j; 
+    if (l > idx){
+      if (  (idx & k) == 0u && agentgt(idx,l) || (idx & k) != 0u && agentlt(idx, l)){
+        swap(idx, l);
+      }
+    }
+  }`;
+
+  // minify the wgsl
+  return baseWGSL.replace('/\s+/g', ' ').trim();
+}
+
+
+function fillSortPipelineList(device,
+                              numAgents : number, 
+                              computePipelinesSort,
+                              compBuffManager){
+
+    // be sure the list is empty before pushing new pipelines
+    computePipelinesSort.length = 0;
+
+    // set up sort pipelines
+    for (let k = 2; k <= numAgents; k *= 2){ // k is doubled every iteration
+      for (let j = k/2; j > 0; j = Math.floor(j/2)){ // j is halved at every iteration, with truncation of fractional parts
+        computePipelinesSort.push(
+          device.createComputePipeline({
+            layout: device.createPipelineLayout({
+                bindGroupLayouts: [compBuffManager.bindGroupLayout]
+            }),
+            compute: {
+              module: device.createShaderModule({
+                code: getSortStepWGSL(numAgents, k, j),
+              }),
+              entryPoint: 'main',
+            },
+          })
+        );
+      }
+    }
+}
+
 const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   ///////////////////////////////////////////////////////////////////////
@@ -60,7 +152,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const simulationParams = {
     simulate: true,
     deltaTime: 0.02,
-    numAgents: 100,
+    numAgents: 1024,
     resetSimulation: () => { resetSim = true; }
   };
 
@@ -69,7 +161,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
-  simFolder.add(simulationParams, 'numAgents', 10, 100000, 10);
+  simFolder.add(simulationParams, 'numAgents', 10, 100000, 2);
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
@@ -116,24 +208,52 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   // Create Compute Pipelines
   //////////////////////////////////////////////////////////////////////////////
   {
-    var computeShaders = [
+    var computeShadersPreSort = [
       explicitIntegrationWGSL, 
+    ];
+    var computeShadersPostSort = [
       findNeighborsWGSL, 
       contactSolveWGSL, 
-      constraintSolveWGSL, 
+      //constraintSolveWGSL, 
       finalizeVelocityWGSL
     ];
-    var computePipelines = [];
+    var computePipelinesPreSort = [];
+    var computePipelinesSort = [];
+    var computePipelinesPostSort = [];
 
-    for(let i = 0; i < computeShaders.length; i++){
-      computePipelines.push( 
+    // set up pre-sort pipelines
+    for(let i = 0; i < computeShadersPreSort.length; i++){
+      computePipelinesPreSort.push( 
           device.createComputePipeline({
           layout: device.createPipelineLayout({
               bindGroupLayouts: [compBuffManager.bindGroupLayout]
           }),
           compute: {
             module: device.createShaderModule({
-              code: computeShaders[i],
+              code: computeShadersPreSort[i],
+            }),
+            entryPoint: 'main',
+          },
+        })
+      );
+    }
+
+    // set up sort pipelines
+    fillSortPipelineList(device, 
+                         simulationParams.numAgents, 
+                         computePipelinesSort, 
+                         compBuffManager);
+
+    // set up post sort pipelines
+    for(let i = 0; i < computeShadersPostSort.length; i++){
+      computePipelinesPostSort.push( 
+          device.createComputePipeline({
+          layout: device.createPipelineLayout({
+              bindGroupLayouts: [compBuffManager.bindGroupLayout]
+          }),
+          compute: {
+            module: device.createShaderModule({
+              code: computeShadersPostSort[i],
             }),
             entryPoint: 'main',
           },
@@ -191,6 +311,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         // reinitilize buffers based on the new number of agents
         compBuffManager.initBuffers();
         computeBindGroup = compBuffManager.getBindGroup();
+        fillSortPipelineList(device, 
+                            simulationParams.numAgents, 
+                            computePipelinesSort, 
+                            compBuffManager);
         resetSim = false;
       }
 
@@ -200,8 +324,25 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       // execute each compute shader in the order they were pushed onto
       // the computePipelines array
       const passEncoder = commandEncoder.beginComputePass();
-      for (let i = 0; i < computePipelines.length; i++){
-        passEncoder.setPipeline(computePipelines[i]);
+      // ----- Compute Pass Before Sort -----
+      for (let i = 0; i < computePipelinesPreSort.length; i++){
+        passEncoder.setPipeline(computePipelinesPreSort[i]);
+        passEncoder.setBindGroup(0, computeBindGroup);
+        // kick off the compute shader
+        passEncoder.dispatch(Math.ceil(simulationParams.numAgents / 64));
+      }
+
+      // ----- Compute Pass Sort -----
+      for (let i = 0; i < computePipelinesSort.length; i++){
+        passEncoder.setPipeline(computePipelinesSort[i]);
+        passEncoder.setBindGroup(0, computeBindGroup);
+        // kick off the compute shader
+        passEncoder.dispatch(Math.ceil(simulationParams.numAgents / 256));
+      }
+
+      // ----- Compute Pass After Sort -----
+      for (let i = 0; i < computePipelinesPostSort.length; i++){
+        passEncoder.setPipeline(computePipelinesPostSort[i]);
         passEncoder.setBindGroup(0, computeBindGroup);
         // kick off the compute shader
         passEncoder.dispatch(Math.ceil(simulationParams.numAgents / 64));

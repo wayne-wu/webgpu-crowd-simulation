@@ -6,6 +6,7 @@ const minY = 0.5;
 
 export class ComputeBufferManager {
   numAgents : number;
+  numAgentsPadded : number;
 
   // buffer sizes
   simulationUBOBufferSize : number;
@@ -14,15 +15,20 @@ export class ComputeBufferManager {
   agentInstanceSize : number;
   agentPositionOffset : number;
   agentColorOffset : number;
+  cellInstanceSize : number;
 
   device : GPUDevice;
 
   // buffers
   simulationUBOBuffer : GPUBuffer;
-  agentsBuffer : GPUBuffer; // data on each agent, including position, velocity, etc.
+  agentsBuffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
+  cellsBuffer : GPUBuffer;            // start / end indices for each cell (in pairs)
 
   // bind group layout
   bindGroupLayout : GPUBindGroupLayout;
+
+  gridWidth : number;
+  gridHeight : number;
 
   constructor(device: GPUDevice, 
               numAgents: number){
@@ -47,6 +53,10 @@ export class ComputeBufferManager {
 
     this.numAgents = numAgents;
 
+    // bitonic sort requires input of length 2^n so we'll 
+    // need a buffer of this size
+    this.numAgentsPadded = Math.pow(2,Math.ceil(Math.log2(numAgents)));
+
 
     // --- set buffer sizes ---
 
@@ -54,7 +64,16 @@ export class ComputeBufferManager {
       1 * 4 + // deltaTime
       3 * 4 + // padding
       4 * 4 + // seed
+      1 * 4 + // numAgents
+      3 * 4 + // padding
       0;
+
+    this.cellInstanceSize = 
+      2 * 4   // 2 u32 indices per pair of start/end ptrs
+    ;
+
+    this.gridWidth = 100;
+    this.gridHeight = 50;
 
     this.initBuffers();
 
@@ -80,6 +99,13 @@ export class ComputeBufferManager {
       initialAgentData
     );
     this.agentsBuffer.unmap(); 
+ 
+    // cells buffer
+    this.cellsBuffer = this.device.createBuffer({
+      size: this.gridWidth * this.gridHeight * this.cellInstanceSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: false
+    });
   }
 
   setGoal(){
@@ -135,6 +161,13 @@ export class ComputeBufferManager {
           type: "storage"
         }
       },
+      {
+        binding: 2, // cellsBuffer
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage"
+        }
+      },
     ]
   });
   }
@@ -155,6 +188,14 @@ export class ComputeBufferManager {
             buffer: this.agentsBuffer,
             offset: 0,
             size: this.numAgents * this.agentInstanceSize,
+          },
+        },
+        {
+          binding: 2,
+          resource: {
+            buffer: this.cellsBuffer,
+            offset: 0,
+            size: this.gridWidth * this.gridHeight * this.cellInstanceSize,
           },
         },
       ],
@@ -194,7 +235,7 @@ export class ComputeBufferManager {
      
     agents[offset + 3] = diskRadius;
 
-    agents[offset + 4] = color[0];
+    agents[offset + 4] = Math.random(); //color[0];
     agents[offset + 5] = color[1];
     agents[offset + 6] = color[2];
     agents[offset + 7] = color[3];
@@ -213,8 +254,8 @@ export class ComputeBufferManager {
   initAgentsProximity(numAgents : number) {
     const initialAgentData = new Float32Array(numAgents * this.agentInstanceSize / 4);
     for (let i = 0; i < numAgents/2; ++i) {
-      let x = Math.floor(i/10);
-      let z = Math.floor(10+i%10);
+      let x = i%100 - 50;
+      let z = Math.floor(i/100) + 5;
       let v = 0.5;
       this.setAgentData(
         initialAgentData, 2*i,
@@ -226,29 +267,4 @@ export class ComputeBufferManager {
     return initialAgentData;
   }
 
-async readAgent(commandEncoder, i : number){
-    // Get a GPU buffer for reading in an unmapped state.
-    const gpuReadBuffer = this.device.createBuffer({
-      size: this.agentInstanceSize,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-    });
-  
-    // Encode commands for copying buffer to buffer.
-    commandEncoder.copyBufferToBuffer(
-      this.agentsBuffer, // source buffer
-      0, // source offset
-      gpuReadBuffer, // destination buffer
-      0, // destination offset
-      this.agentInstanceSize // size
-    );
-  
-    // Submit GPU commands.
-    const gpuCommands = commandEncoder.finish();
-    this.device.queue.submit([gpuCommands]);
-  
-    // Read buffer.
-    await gpuReadBuffer.mapAsync(GPUMapMode.READ);
-    const arrayBuffer = gpuReadBuffer.getMappedRange();
-    console.log(new Float32Array(arrayBuffer));
-}
 }
