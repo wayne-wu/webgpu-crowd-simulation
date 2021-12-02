@@ -6,7 +6,6 @@ const minY = 0.5;
 
 export class ComputeBufferManager {
   numAgents : number;
-  numAgentsPadded : number;
 
   // buffer sizes
   simulationUBOBufferSize : number;
@@ -42,7 +41,7 @@ export class ComputeBufferManager {
     3 * 4 + // planned position
     1 * 4 + // padding
     3 * 4 + // goal
-    1 * 4 + // padding
+    1 * 4 + // cell
     20 * 4 + // close neighbors
     20 * 4 + // far neighbors
     0;
@@ -50,13 +49,7 @@ export class ComputeBufferManager {
     this.agentPositionOffset = 0;
     this.agentColorOffset = 4 * 4;
 
-
     this.numAgents = numAgents;
-
-    // bitonic sort requires input of length 2^n so we'll 
-    // need a buffer of this size
-    this.numAgentsPadded = Math.pow(2,Math.ceil(Math.log2(numAgents)));
-
 
     // --- set buffer sizes ---
 
@@ -65,8 +58,6 @@ export class ComputeBufferManager {
       1 * 4 + // avoidance (int)
       2 * 4 + // padding
       4 * 4 + // seed
-      1 * 4 + // numAgents
-      3 * 4 + // padding
       0;
 
     this.cellInstanceSize = 
@@ -142,9 +133,6 @@ export class ComputeBufferManager {
           1 + Math.random(), // seed.zw
         ])
       );
-      this.device.queue.writeBuffer(
-        this.simulationUBOBuffer,
-        4, new Int32Array([simulationParams.avoidance]), 0);
   }
 
   setBindGroupLayout(){
@@ -263,10 +251,10 @@ export class ComputeBufferManager {
       let v = 0.5;
       this.setAgentData(
         initialAgentData, 2*i,
-        [0.1+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
+        [1.25+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
       this.setAgentData(
         initialAgentData, 2*i + 1,
-        [-0.1+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
+        [-1.25+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
     }
     return initialAgentData;
   }
