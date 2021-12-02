@@ -62,7 +62,8 @@ export class ComputeBufferManager {
 
     this.simulationUBOBufferSize =
       1 * 4 + // deltaTime
-      3 * 4 + // padding
+      1 * 4 + // avoidance (int)
+      2 * 4 + // padding
       4 * 4 + // seed
       1 * 4 + // numAgents
       3 * 4 + // padding
@@ -141,6 +142,9 @@ export class ComputeBufferManager {
           1 + Math.random(), // seed.zw
         ])
       );
+      this.device.queue.writeBuffer(
+        this.simulationUBOBuffer,
+        4, new Int32Array([simulationParams.avoidance]), 0);
   }
 
   setBindGroupLayout(){
@@ -259,10 +263,10 @@ export class ComputeBufferManager {
       let v = 0.5;
       this.setAgentData(
         initialAgentData, 2*i,
-        [1.25+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
+        [0.1+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
       this.setAgentData(
         initialAgentData, 2*i + 1,
-        [-1.25+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
+        [-0.1+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
     }
     return initialAgentData;
   }

@@ -153,6 +153,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     simulate: true,
     deltaTime: 0.02,
     numAgents: 1024,
+    avoidance: false,
     resetSimulation: () => { resetSim = true; }
   };
 
@@ -161,7 +162,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
-  simFolder.add(simulationParams, 'numAgents', 10, 100000, 2);
+  simFolder.add(simulationParams, 'numAgents', 10, 100000, 10);
+  simFolder.add(simulationParams, 'avoidance');
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
@@ -214,7 +216,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     var computeShadersPostSort = [
       findNeighborsWGSL, 
       contactSolveWGSL, 
-      //constraintSolveWGSL, 
+      constraintSolveWGSL, 
       finalizeVelocityWGSL
     ];
     var computePipelinesPreSort = [];

@@ -1,12 +1,15 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Simulation Compute shader
+// Finalize Velocity Compute Shader
 ////////////////////////////////////////////////////////////////////////////////
 
-let maxSpeed : f32 = 2.0;
-let maxNeighbors : u32 = 20u;
+let xsph_c : f32 = 5.0;    // paper = 7.0
+let xsph_h : f32 = 100.0;  // paper = 217.0 // the smoothing distance specified in the paper (assumes particles with radius 1)
+let maxSpeed : f32 = 1.4;  // paper = 1.4
+
 
 [[block]] struct SimulationParams {
   deltaTime : f32;
+  avoidance : i32;
   seed : vec4<f32>;
 };
 
@@ -30,12 +33,11 @@ struct Agent {
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 
 fn getW(d : f32) -> f32 {
-    var h = 7.0; // the smoothing distance specified in the paper (assumes particles with radius 1)
     var w = 0.0; // poly6 smoothing kernel
 
-    if (0.0 <= d && d <= h) {
-        w = 315.0 / (64.0 * 3.14159 * pow(h, 9.0));
-        w = w * pow( pow(h, 2.0) - pow(d, 2.0), 3.0 );
+    if (0.0 <= d && d <= xsph_h) {
+        w = 315.0 / (64.0 * 3.14159 * pow(xsph_h, 9.0));
+        w = w * pow( pow(xsph_h, 2.0) - pow(d, 2.0), 3.0 );
     }
     return w;
 }
@@ -50,7 +52,6 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
   // 4.3 Cohesion
   // update velocity to factor in viscosity
-  var c = 1.0; // based on paper
   var velAvg = vec3<f32>(0.0); // weighted average of all the velocity differences
 
   for (var i : u32 = 0u; i < agent.nearNeighbors[0]; i = i + 1u){
@@ -59,7 +60,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     var w = getW(d*d);
     velAvg = velAvg + (agent.v - neighbor.v) * w;
   }
-  agent.v = agent.v + c * velAvg;
+  agent.v = agent.v + xsph_c * velAvg;
 
   // 4.6 Maximum Speed and Acceleration Limiting
   if(length(agent.v) > maxSpeed){
