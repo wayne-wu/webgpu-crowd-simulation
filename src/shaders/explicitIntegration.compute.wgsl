@@ -9,8 +9,8 @@ let maxNeighbors : u32 = 20u;
 
 [[block]] struct SimulationParams {
   deltaTime : f32;
-  avoidance : i32;
-  seed : vec4<f32>;
+  avoidance : f32;
+  numAgents : f32;
 };
 
 struct Agent {
@@ -21,8 +21,7 @@ struct Agent {
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
   goal : vec3<f32>;
-  nearNeighbors : array<u32, 20>; 
-  farNeighbors : array<u32, 20>;
+  cell : i32;
 };
 
 [[block]] struct Agents {
@@ -42,6 +41,10 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
   let idx = GlobalInvocationID.x;
   var agent = agentData.agents[idx];
+
+  if (idx >= u32(sim_params.numAgents)){
+    return;
+  }
 
   // velcity planning
   var vp = getVelocityFromPlanner(agent);

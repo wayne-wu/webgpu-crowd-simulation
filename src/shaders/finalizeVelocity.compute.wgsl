@@ -5,12 +5,13 @@
 let xsph_c : f32 = 7.0;    // paper = 7.0
 let xsph_h : f32 = 217.0;  // paper = 217.0 // the smoothing distance specified in the paper (assumes particles with radius 1)
 let maxSpeed : f32 = 1.4;  // paper = 1.4
-
+let nearRadius : f32 = 2.0;
 
 [[block]] struct SimulationParams {
   deltaTime : f32;
-  avoidance : i32;
-  seed : vec4<f32>;
+  avoidance : f32;
+  numAgents : f32;
+  gridWidth : f32;
 };
 
 struct Agent {
@@ -21,16 +22,25 @@ struct Agent {
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
   goal : vec3<f32>;
-  nearNeighbors : array<u32, 20>; 
-  farNeighbors : array<u32, 20>;
+  cell : i32;
 };
 
 [[block]] struct Agents {
   agents : array<Agent>;
 };
 
+struct CellIndices {
+  start : u32;
+  end   : u32;
+};
+
+[[block]] struct Grid {
+  cells : array<CellIndices>;
+};
+
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
+[[binding(2), group(0)]] var<storage, read_write> grid : Grid;
 
 fn getW(d : f32) -> f32 {
     var w = 0.0; // poly6 smoothing kernel
@@ -54,11 +64,46 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   // update velocity to factor in viscosity
   var velAvg = vec3<f32>(0.0); // weighted average of all the velocity differences
 
-  for (var i : u32 = 0u; i < agent.nearNeighbors[0]; i = i + 1u){
-    var neighbor = agentData.agents[agent.nearNeighbors[1u+i]];
-    var d = distance(agent.x, neighbor.x);  // Should this be xp or x?
-    var w = getW(d*d);
-    velAvg = velAvg + (agent.v - neighbor.v) * w;
+  if (agent.cell < 0){
+    // ignore invalid cells
+    agent.c = vec4<f32>(0.5, 0.5, 0.5, 1.0);
+    agentData.agents[idx] = agent;
+    return;
+  }
+
+  let gridWidth = i32(sim_params.gridWidth);
+  let gridHeight = i32(sim_params.gridWidth);
+  // compute neighbors
+  var nearCount = 0u;
+  var farCount = 0u;
+  //// TODO don't hardcode 9 cells 
+  let cellsToCheck = 9u;
+  var nearCellNums = array<i32, 9u>(
+    agent.cell + gridWidth - 1, agent.cell + gridWidth, agent.cell + gridWidth + 1,
+    agent.cell - 1, agent.cell, agent.cell+1, 
+    agent.cell - gridWidth - 1, agent.cell - gridWidth, agent.cell - gridWidth + 1);
+
+  for (var c : u32 = 0u; c < cellsToCheck; c = c + 1u ){
+    let cellIdx = nearCellNums[c];
+    if (cellIdx < 0 || cellIdx >= gridWidth * gridHeight){
+      continue;
+    }
+    let cell : CellIndices = grid.cells[cellIdx];
+    for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
+
+      if (idx == i) { 
+        // ignore ourselves
+        continue; 
+      }
+
+      var neighbor = agentData.agents[i];
+      var d = distance(agent.x, neighbor.x);  // Should this be xp or x?
+      if (d >= nearRadius){
+        continue;
+      }
+      var w = getW(d*d);
+      velAvg = velAvg + (agent.v - neighbor.v) * w;
+    }
   }
   agent.v = agent.v + xsph_c * velAvg;
 

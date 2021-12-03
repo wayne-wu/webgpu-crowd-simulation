@@ -19,6 +19,7 @@ export class ComputeBufferManager {
   testScene : TestScene;
 
   numAgents : number;
+  numValidAgents : number; 
   numObstacles : number;
 
   // buffer sizes
@@ -46,33 +47,36 @@ export class ComputeBufferManager {
   bindGroupLayout : GPUBindGroupLayout;
 
   gridWidth : number;
-  gridHeight : number;
 
   constructor(device: GPUDevice,
               testScene: TestScene, 
-              numAgents: number){
+              numAgents: number,
+              gridWidth: number){
     this.device = device;
     this.testScene = testScene;
-    this.agentInstanceSize = 
-    3 * 4 + // position
-    1 * 4 + // radius
-    4 * 4 + // color
-    3 * 4 + // velocity
-    1 * 4 + // inverse mass
-    3 * 4 + // planned position
-    1 * 4 + // padding
-    3 * 4 + // goal
-    1 * 4 + // cell
-    20 * 4 + // close neighbors
-    20 * 4 + // far neighbors
-    0;
 
     this.agentPositionOffset = 0;
     this.agentColorOffset = 4 * 4;
 
-    this.numAgents = numAgents;
+    this.numAgents = Math.pow(2, Math.ceil(Math.log2(numAgents)));
+    this.numValidAgents = numAgents;
     
     this.numObstacles = 1;
+
+    // --- set buffer sizes ---
+
+    this.agentInstanceSize = 
+      3 * 4 + // position
+      1 * 4 + // radius
+      4 * 4 + // color
+      3 * 4 + // velocity
+      1 * 4 + // inverse mass
+      3 * 4 + // planned position
+      3 * 4 + // goal
+      1 * 4 + // padding TODO make id?
+      1 * 4 + // cell
+      0;
+
     this.obstacleInstanceSize =
       3 * 4 + // position
       1 * 4 + // rotation-y
@@ -83,16 +87,16 @@ export class ComputeBufferManager {
     this.simulationUBOBufferSize =
       1 * 4 + // deltaTime
       1 * 4 + // avoidance (int)
-      2 * 4 + // padding
-      4 * 4 + // seed
+      1 * 4 + // numAgents
+      1 * 4 + // gridWidth
       0;
 
     this.cellInstanceSize = 
-      2 * 4   // 2 u32 indices per pair of start/end ptrs
-    ;
+      2 * 4 +   // 2 u32 indices per pair of start/end ptrs
+      2 * 4 +   // padding
+      0;
 
-    this.gridWidth = 100;
-    this.gridHeight = 50;
+    this.gridWidth = gridWidth;
 
     this.initBuffers();
 
@@ -100,6 +104,8 @@ export class ComputeBufferManager {
   }
 
   initBuffers(){
+
+    this.numAgents = Math.pow(2, Math.ceil(Math.log2(this.numValidAgents)));
 
     const agentData = new Float32Array(this.numAgents * this.agentInstanceSize / 4); ;
     const obstacleData = new Float32Array(this.numObstacles * this.obstacleInstanceSize / 4); ;
@@ -126,22 +132,22 @@ export class ComputeBufferManager {
     });
 
     // agent buffer
-    //let initialAgentData = this.getAgentData(this.numAgents);
     this.agentsBuffer = this.device.createBuffer({
       size: this.numAgents * this.agentInstanceSize,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
       mappedAtCreation: true
     });
     new Float32Array(this.agentsBuffer.getMappedRange()).set(agentData);
     this.agentsBuffer.unmap(); 
- 
+
     // cells buffer
     this.cellsBuffer = this.device.createBuffer({
-      size: this.gridWidth * this.gridHeight * this.cellInstanceSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      size: this.gridWidth * this.gridWidth * this.cellInstanceSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
       mappedAtCreation: false
     });
 
+    // obstacles buffer
     this.obstaclesBuffer = this.device.createBuffer({
       size: this.numObstacles * this.obstacleInstanceSize,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
@@ -152,20 +158,16 @@ export class ComputeBufferManager {
   }
 
   writeSimParams(simulationParams){
-      this.device.queue.writeBuffer(
-        this.simulationUBOBuffer,
-        0,
-        new Float32Array([
-          simulationParams.simulate ? simulationParams.deltaTime : 0.0,
-          0.0,
-          0.0,
-          0.0, // padding
-          Math.random() * 100,
-          Math.random() * 100, // seed.xy
-          1 + Math.random(),
-          1 + Math.random(), // seed.zw
-        ])
-      );
+    this.device.queue.writeBuffer(
+      this.simulationUBOBuffer,
+      0,
+      new Float32Array([
+        simulationParams.simulate ? simulationParams.deltaTime : 0.0,
+        simulationParams.avoidance,
+        this.numAgents,
+        this.gridWidth
+      ])
+    );
   }
 
   setBindGroupLayout(){
@@ -187,7 +189,14 @@ export class ComputeBufferManager {
         }
       },
       {
-        binding: 2, // obstacleBuffer
+        binding: 2, // cellsBuffer
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage"
+        }
+      },
+      {
+        binding: 3, // obstacleBuffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
@@ -217,6 +226,14 @@ export class ComputeBufferManager {
         },
         {
           binding: 2,
+          resource: {
+            buffer: this.cellsBuffer,
+            offset: 0,
+            size: this.gridWidth * this.gridWidth * this.cellInstanceSize,
+          },
+        },
+        {
+          binding: 3,
           resource: {
             buffer: this.obstaclesBuffer,
             offset: 0,
@@ -253,7 +270,7 @@ export class ComputeBufferManager {
      
     agents[offset + 3] = diskRadius;
 
-    agents[offset + 4] = Math.random(); //color[0];
+    agents[offset + 4] = color[0];
     agents[offset + 5] = color[1];
     agents[offset + 6] = color[2];
     agents[offset + 7] = color[3];
@@ -271,8 +288,8 @@ export class ComputeBufferManager {
 
   initProximal(agents : Float32Array, obstacles: Float32Array) {
     for (let i = 0; i < agents.length/2; ++i) {
-      let x = i%10 - 5;
-      let z = Math.floor(i/10) + 10;
+      let x = i%50 - 25;
+      let z = Math.floor(i/50) + 5;
       let v = 0.5;
       this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
       this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);

@@ -1,11 +1,12 @@
 
 ////////////////////////////////////////////////////////////////////////////////
-// Simulation Compute shader
+// Assign Cells Compute shader
 ////////////////////////////////////////////////////////////////////////////////
 [[block]] struct SimulationParams {
   deltaTime : f32;
-  avoidance : i32;
-  seed : vec4<f32>;
+  avoidance : f32;
+  numAgents : f32;
+  gridWidth : f32;
 };
 
 struct Agent {
@@ -16,9 +17,7 @@ struct Agent {
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
   goal : vec3<f32>;
-  cell : u32;      // grid cell (linear form)
-  nearNeighbors : array<u32, 20>; 
-  farNeighbors : array<u32, 20>;
+  cell : i32;      // grid cell (linear form)
 };
 
 [[block]] struct Agents {
@@ -30,28 +29,39 @@ struct Agent {
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
+  // Calculate which grid cell each agent is in and store it
+
   let idx = GlobalInvocationID.x;
-  var agent = agentData.agents[idx];
-
-  let gridWidth = 50.0;
-  let gridHeight = 50.0;
-  let cellWidth = 2.0;
-
-  let pos = vec3<f32>(agent.x.x + 50.0, agent.x.y, agent.x.z + 50.0);
-  
-  var cell = vec2<f32>(pos.x / cellWidth, pos.z / cellWidth);
-
-  // if outside grid, belongs to first grid cell
-  if (cell.x >= gridWidth || cell.y >= gridHeight ||
-      cell.x < 0.0 || cell.y < 0.0) {
-        cell = vec2<f32>(0.0, 0.0);
+  if (idx >= u32(sim_params.numAgents)){
+    return;
   }
 
-  let cellID = u32(cell.x + gridWidth * cell.y);
-  agent.cell = cellID;
+  var agent = agentData.agents[idx];
 
-  // change color for debugging purposes
-  agent.c = vec4<f32>(cell.x / gridWidth, 0.0, cell.y / gridHeight, 1.0);
+  let gridWidth = sim_params.gridWidth;
+  let gridHeight = sim_params.gridWidth;
+  let cellWidth = 1000.0 / gridWidth;
+
+  // get position relative to the start of the grid
+  // (world origin is at the center of the grid)
+  let pos = vec3<f32>(agent.x.x + (cellWidth * gridWidth / 2.0), 
+                      agent.x.y, 
+                      agent.x.z + (cellWidth * gridHeight / 2.0));
+  
+  var cell = vec2<i32>(i32(pos.x / cellWidth), i32(pos.z / cellWidth));
+
+  var cellID : i32;
+
+  // if outside grid, note that it's in an invalid cell
+  if (cell.x >= i32(gridWidth) || cell.y >= i32(gridHeight) ||
+      pos.x < 0.0 || pos.z < 0.0) {
+    cellID = -1; 
+  }
+  else {
+    cellID = cell.x + i32(gridWidth) * cell.y;
+  }
+
+  agent.cell = cellID;
 
   // Store the new agent value
   agentData.agents[idx] = agent;

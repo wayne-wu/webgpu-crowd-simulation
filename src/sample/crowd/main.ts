@@ -9,12 +9,11 @@ import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
 import explicitIntegrationWGSL from '../../shaders/explicitIntegration.compute.wgsl';
 import assignCellsWGSL from '../../shaders/assignCells.compute.wgsl';
-import findNeighborsWGSL from '../../shaders/findNeighbors.compute.wgsl';
+import buildHashGrid from '../../shaders/buildHashGrid.compute.wgsl';
 import contactSolveWGSL from '../../shaders/contactSolve.compute.wgsl';
 import constraintSolveWGSL from '../../shaders/constraintSolve.compute.wgsl';
 import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.compute.wgsl';
 import { render } from 'react-dom';
-
 
 let camera : Camera;
 let aspect : number;
@@ -27,9 +26,8 @@ function resetCameraFunc() {
   camera.updateProjectionMatrix();
 }
 
-
 function getSortStepWGSL(numAgents : number, k : number, j : number, ){
-  // bitonic sort as I understand it requires a device-wide join after every "step" to avoid
+  // bitonic sort requires a device-wide join after every "step" to avoid
   // race conditions. The least gross way I can think to do that is to create a new pipeline
   // for each step.
   let baseWGSL = `
@@ -41,9 +39,7 @@ function getSortStepWGSL(numAgents : number, k : number, j : number, ){
     w  : f32;
     xp : vec3<f32>;  // planned/predicted position
     goal: vec3<f32>;
-    cell : u32;      // grid cell (linear form)
-    nearNeighbors : array<u32, 20>; 
-    farNeighbors : array<u32, 20>;
+    cell : i32;      // grid cell (linear form)
   };
 
   [[block]] struct Agents {
@@ -53,28 +49,22 @@ function getSortStepWGSL(numAgents : number, k : number, j : number, ){
   [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 
   fn swap(idx1 : u32, idx2 : u32) {
-    //var tmp = agentData.agents[idx1];
-    //agentData.agents[idx1] = agentData.agents[idx2];
-    //agentData.agents[idx2] = tmp; 
-    var tmp = agentData.agents[idx1].c[0];
-    agentData.agents[idx1].c[0] = agentData.agents[idx2].c[0];
-    agentData.agents[idx2].c[0] = tmp; 
+    var tmp = agentData.agents[idx1];
+    agentData.agents[idx1] = agentData.agents[idx2];
+    agentData.agents[idx2] = tmp; 
   }
 
   fn agentlt(idx1 : u32, idx2 : u32) -> bool {
-    //return agentData.agents[idx1].cell < agentData.agents[idx2].cell;
-    return agentData.agents[idx1].c[0] < agentData.agents[idx2].c[0];
+    return agentData.agents[idx1].cell < agentData.agents[idx2].cell;
   }
 
   fn agentgt(idx1 : u32, idx2 : u32) -> bool {
-    //return agentData.agents[idx1].cell > agentData.agents[idx2].cell;
-    return agentData.agents[idx1].c[0] > agentData.agents[idx2].c[0];
+    return agentData.agents[idx1].cell > agentData.agents[idx2].cell;
   }
 
   [[stage(compute), workgroup_size(256)]]
   fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     let idx = GlobalInvocationID.x ;
-    var agent = agentData.agents[idx];
     
     var j : u32 = ${j}u;
     var k : u32 = ${k}u;
@@ -135,7 +125,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   ////////////////////////////////////////////////////////////////////////
   
   const guiParams = {
-    gridWidth: 50,
+    gridWidth: 200,
     resetCamera: resetCameraFunc,
     gridOn: true
   };
@@ -144,7 +134,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   resetSim = true;
 
   let gridFolder = gui.addFolder("Grid");
-  gridFolder.add(guiParams, 'gridWidth', 1, 500, 1);
+  gridFolder.add(guiParams, 'gridWidth', 1, 5000, 1);
   gridFolder.add(guiParams, 'gridOn');
   gridFolder.open();
   let camFolder = gui.addFolder("Camera");
@@ -154,9 +144,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const simulationParams = {
     simulate: true,
     deltaTime: 0.02,
-    numAgents: 100,
+    numAgents: 1024,
     numObstacles : 1,
     avoidance: false,
+    gridWidth: guiParams.gridWidth,
     testScene: TestScene.PROXIMAL,
     resetSimulation: () => { resetSim = true; }
   };
@@ -167,7 +158,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
-  simFolder.add(simulationParams, 'numAgents', 10, 100000, 10);
+  simFolder.add(simulationParams, 'numAgents', 10, 100000, 2);
   simFolder.add(simulationParams, 'avoidance');
   simFolder.add(simulationParams, 'testScene', {
     'Proximal Behavior': TestScene.PROXIMAL, 
@@ -207,7 +198,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   /////////////////////////////////////////////////////////////////////////
   var compBuffManager = new ComputeBufferManager(device,
                                                  simulationParams.testScene,
-                                                 simulationParams.numAgents);
+                                                 simulationParams.numAgents,
+                                                 simulationParams.gridWidth);
 
   //////////////////////////////////////////////////////////////////////////
   //                Render Buffer and Pipeline Setup                      //
@@ -225,7 +217,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       assignCellsWGSL,
     ];
     var computeShadersPostSort = [
-      findNeighborsWGSL, 
+      buildHashGrid,
       contactSolveWGSL, 
       constraintSolveWGSL, 
       finalizeVelocityWGSL
@@ -253,7 +245,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     // set up sort pipelines
     fillSortPipelineList(device, 
-                         simulationParams.numAgents, 
+                         compBuffManager.numAgents, 
                          computePipelinesSort, 
                          compBuffManager);
 
@@ -303,6 +295,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     // Compute new grid lines if there's a change in the gui
     if (prevGridWidth != guiParams.gridWidth) {
       renderBuffManager.resetGridLinesBuffer(guiParams.gridWidth);
+      resetSim = true;
+      simulationParams.gridWidth = guiParams.gridWidth;
       prevGridWidth = guiParams.gridWidth;
     }
 
@@ -313,6 +307,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     //------------------ Compute Calls ------------------------ //
     {
       if (prevNumAgents != simulationParams.numAgents) {
+        // NOTE: we also reset the sim if the grid width changes
+        // which is checked just above this
         prevNumAgents = simulationParams.numAgents;
         // set reset sim to true so that simulation starts over
         // and agents are redistributed
@@ -323,19 +319,19 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         prevTestScene = simulationParams.testScene;
         switch(simulationParams.testScene) {
           case TestScene.PROXIMAL:
-            simulationParams.numAgents = 1<<7;
+            compBuffManager.numValidAgents = 1<<7;
             simulationParams.numObstacles = 0;
             break;
           case TestScene.BOTTLENECK:
-            simulationParams.numAgents = 1<<10;
+            compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 2;
             break;
           case TestScene.DENSE:
-            simulationParams.numAgents = 1<<15;
+            compBuffManager.numValidAgents = 1<<15;
             simulationParams.numObstacles = 0;
             break;
           case TestScene.SPARSE:
-            simulationParams.numAgents = 1<<13;
+            compBuffManager.numValidAgents = 1<<13;
             simulationParams.numObstacles = 0;
             break;
         }
@@ -345,7 +341,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       // recompute agent buffer if resetSim button pressed
       if (resetSim) {
         compBuffManager.testScene = simulationParams.testScene;
-        compBuffManager.numAgents = simulationParams.numAgents;
+        //compBuffManager.numValidAgents = simulationParams.numAgents;
+        compBuffManager.gridWidth = simulationParams.gridWidth;
 
         // NOTE: Can't have 0 binding size so we just set to 1 dummy if no obstacles
         compBuffManager.numObstacles = Math.max(simulationParams.numObstacles, 1);
@@ -353,8 +350,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         // reinitilize buffers based on the new number of agents
         compBuffManager.initBuffers();
         computeBindGroup = compBuffManager.getBindGroup();
+        // the number of steps in the sort pipeline is proportional
+        // to log2 the number of agents, so reinitiliaze it
         fillSortPipelineList(device, 
-                            simulationParams.numAgents, 
+                            compBuffManager.numAgents, 
                             computePipelinesSort, 
                             compBuffManager);
         resetSim = false;
@@ -366,12 +365,12 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       // execute each compute shader in the order they were pushed onto
       // the computePipelines array
       const passEncoder = commandEncoder.beginComputePass();
-      // ----- Compute Pass Before Sort -----
+      //// ----- Compute Pass Before Sort -----
       for (let i = 0; i < computePipelinesPreSort.length; i++){
         passEncoder.setPipeline(computePipelinesPreSort[i]);
         passEncoder.setBindGroup(0, computeBindGroup);
         // kick off the compute shader
-        passEncoder.dispatch(Math.ceil(simulationParams.numAgents / 64));
+        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 64));
       }
 
       // ----- Compute Pass Sort -----
@@ -379,7 +378,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         passEncoder.setPipeline(computePipelinesSort[i]);
         passEncoder.setBindGroup(0, computeBindGroup);
         // kick off the compute shader
-        passEncoder.dispatch(Math.ceil(simulationParams.numAgents / 256));
+        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 256));
       }
 
       // ----- Compute Pass After Sort -----
@@ -387,11 +386,12 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         passEncoder.setPipeline(computePipelinesPostSort[i]);
         passEncoder.setBindGroup(0, computeBindGroup);
         // kick off the compute shader
-        passEncoder.dispatch(Math.ceil(simulationParams.numAgents / 64));
+        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 64));
       }
       passEncoder.endPass();
 
     }
+
     // ------------------ Render Calls ------------------------- //
     {
       const transformationMatrix = getTransformationMatrix();
