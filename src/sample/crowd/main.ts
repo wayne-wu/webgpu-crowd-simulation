@@ -415,6 +415,11 @@ const Crowd: () => JSX.Element = () =>
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         contents: require('!!raw-loader!../../meshes/cube.ts').default,
       },
+      {
+        name: '../../meshes/mesh.ts',
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        contents: require('!!raw-loader!../../meshes/mesh.ts').default,
+      },
     ],
     filename: __filename,
   });

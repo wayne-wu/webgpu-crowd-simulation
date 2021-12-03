@@ -10,7 +10,7 @@ module.exports = {
   reactStrictMode: true,
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     config.module.rules.push({
-      test: /\.(png|jpe?g|gif|webm)$/i,
+      test: /\.(png|jpe?g|gif|webm|glb|gltf)$/i,
       use: {
         loader: 'file-loader',
         options: {

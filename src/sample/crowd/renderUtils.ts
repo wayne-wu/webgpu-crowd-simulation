@@ -26,6 +26,7 @@ import {
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
 import { mat4 } from 'gl-matrix';
+import { meshVertexArray } from '../../meshes/mesh';
 
 export class renderBufferManager {
 
@@ -34,6 +35,7 @@ export class renderBufferManager {
   platformVertexBuffer    : GPUBuffer;
   gridLinesVertexBuffer   : GPUBuffer;
   prototypeVertexBuffer   : GPUBuffer;
+  meshVertexBuffer        : GPUBuffer;
 
   platformPipeline        : GPURenderPipeline;
   gridLinesPipeline       : GPURenderPipeline;
@@ -68,6 +70,8 @@ export class renderBufferManager {
     this.gridLinesVertexBuffer = getVerticesBuffer(this.device, gridLinesVertexArray);
 
     this.prototypeVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
+
+    this.meshVertexBuffer = getVerticesBuffer(this.device, meshVertexArray);
   }
 
   buildPipelines(presentationFormat, agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset:number) {
