@@ -16,7 +16,7 @@ export const meshVertexArray = new Float32Array();
  let scene = new Scene();
 
 new GLTFLoader()
-	.load( '../../public/char1.glb', function ( gltf ) {
+	.load( '/char1.glb', function ( gltf ) {
 
 		scene.add( gltf.scene );
 		//const object = gltf.scene.getObjectByName( 'char1_fabric' );
