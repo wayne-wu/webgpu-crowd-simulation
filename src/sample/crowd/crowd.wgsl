@@ -15,7 +15,15 @@ fn rand() -> f32 {
 [[block]] struct RenderParams {
   modelViewProjectionMatrix : mat4x4<f32>;
 };
+[[block]] struct CameraPosition {
+  p : vec4<f32>;
+};
+[[block]] struct AgentScale {
+  s : f32;
+};
 [[binding(0), group(0)]] var<uniform> render_params : RenderParams;
+[[binding(1), group(0)]] var<uniform> cameraPos: CameraPosition;
+[[binding(2), group(0)]] var<uniform> agentScale: AgentScale;
 
 struct VertexInput {
   [[location(0)]] position : vec3<f32>;  // agent position (world space)
@@ -23,6 +31,7 @@ struct VertexInput {
   [[location(2)]] velocity : vec4<f32>;  // agent velocity
   [[location(3)]] mesh_pos : vec4<f32>;  // mesh vertex position (model space)
   [[location(4)]] mesh_uv  : vec2<f32>;  // mesh vertex uv
+  [[location(5)]] mesh_nor : vec4<f32>;  // mesh vertex normal
 };
 
 struct VertexOutput {
@@ -30,6 +39,7 @@ struct VertexOutput {
   [[location(0)]]       color    : vec4<f32>;
   [[location(1)]]       mesh_pos : vec4<f32>;
   [[location(2)]]       mesh_uv  : vec2<f32>;
+  [[location(3)]]       mesh_nor : vec4<f32>;
 };
 
 [[stage(vertex)]]
@@ -40,15 +50,24 @@ fn vs_main(in : VertexInput) -> VertexOutput {
   // TODO: How to construct mat4x4?
   var model = mat4x4<f32>();
   var scale = mat4x4<f32>();
-  scale[0] = vec4<f32>(0.005, 0.0, 0.0, 0.0);
-  scale[1] = vec4<f32>(0.0, 0.005, 0.0, 0.0);
-  scale[2] = vec4<f32>(0.0, 0.0, 0.005, 0.0);
+  scale[0] = vec4<f32>(agentScale.s, 0.0, 0.0, 0.0);
+  scale[1] = vec4<f32>(0.0, agentScale.s, 0.0, 0.0);
+  scale[2] = vec4<f32>(0.0, 0.0, agentScale.s, 0.0);
   scale[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
+  // var rot = mat4x4<f32>();
+  // var right = vel;
+  // var up = vec4<f32>(0.0, 1.0, 0.0, 0.0);
+  // var forward = normalize(vec4<f32>(cross(right.xyz, up.xyz), 0.0));
+  // rot[0] = right;
+  // rot[1] = up;
+  // rot[2] = forward;
+  // rot[3] = scale[3];
+
   var rot = mat4x4<f32>();
-  var right = vel;
+  var forward = vel;
   var up = vec4<f32>(0.0, 1.0, 0.0, 0.0);
-  var forward = normalize(vec4<f32>(cross(right.xyz, up.xyz), 0.0));
+  var right = normalize(vec4<f32>(cross(forward.xyz, up.xyz), 0.0));
   rot[0] = right;
   rot[1] = up;
   rot[2] = forward;
@@ -67,6 +86,7 @@ fn vs_main(in : VertexInput) -> VertexOutput {
   out.color = in.color;
   out.mesh_uv = in.mesh_uv;
   out.mesh_pos = in.mesh_pos;
+  out.mesh_nor = rot * in.mesh_nor;
   return out;
 }
 
@@ -77,7 +97,11 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
   //var lightPos = vec4<f32>(1, 1, 1);
   //var lambert = 
-  return in.color;
+  var camera = cameraPos.p;
+  var cameraDir = in.position - camera;
+  var lightDir = vec4<f32>(1.0, 1.0, 1.0, 0.0);
+  var lambertTerm = dot(normalize(lightDir), normalize(in.mesh_nor));
+  return in.color + lambertTerm * vec4<f32>(1.0, 1.0, 1.0, 1.0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

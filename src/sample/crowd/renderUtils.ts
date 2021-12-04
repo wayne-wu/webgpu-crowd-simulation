@@ -28,6 +28,8 @@ import crowdWGSL from './crowd.wgsl';
 import { mat4 } from 'gl-matrix';
 import { Mesh } from '../../meshes/mesh';
 
+import { vec4 } from 'gl-matrix';
+
 export class renderBufferManager {
 
   device : GPUDevice;
@@ -44,10 +46,14 @@ export class renderBufferManager {
   platformUniformBuffer   : GPUBuffer;
   gridLinesUniformBuffer  : GPUBuffer;
   crowdUniformBuffer      : GPUBuffer;
+  u_CameraPosBuffer       : GPUBuffer;
+  u_AgentScale            : GPUBuffer;
 
   platformBindGroup       : GPUBindGroup;
   gridLinesBindGroup      : GPUBindGroup;
   crowdBindGroup          : GPUBindGroup;
+
+  bindGroupLayout         : GPUBindGroupLayout;
 
   renderPassDescriptor    : GPURenderPassDescriptor;
 
@@ -55,14 +61,17 @@ export class renderBufferManager {
 
   constructor (device: GPUDevice, gridWidth: number, presentationFormat, presentationSize,
                agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset: number, 
-               agentVelocityOffset: number, mesh : Mesh) 
+               agentVelocityOffset: number, mesh : Mesh, cameraPos: vec4) 
   {
     this.device = device;
     this.mesh = mesh;
     this.initBuffers(gridWidth);
-    this.buildPipelines(presentationFormat, agentInstanceByteSize, agentPositionOffset, agentColorOffset, agentVelocityOffset);
+    
+    this.setBindGroupLayout();
+    this.buildPipelines(presentationFormat, agentInstanceByteSize, agentPositionOffset, agentColorOffset, agentVelocityOffset);  
     this.setBindGroups();
     this.setRenderPassDescriptor(presentationSize);
+
   }
 
   initBuffers(gridWidth: number) {
@@ -78,7 +87,8 @@ export class renderBufferManager {
     this.meshVertexBuffer = getVerticesBuffer(this.device, this.mesh.vertexArray);
   }
 
-  buildPipelines(presentationFormat, agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset: number, agentVelocityOffset: number) {
+  buildPipelines(presentationFormat, agentInstanceByteSize: number, agentPositionOffset: number, 
+                agentColorOffset: number, agentVelocityOffset: number) {
 
     this.platformPipeline = getPipeline(
       this.device, renderWGSL, 'vs_main', 'fs_platform', platformVertexSize,
@@ -92,7 +102,8 @@ export class renderBufferManager {
 
     this.crowdPipeline = getCrowdRenderPipeline(
       this.device, crowdWGSL, agentInstanceByteSize, agentPositionOffset, 
-      agentColorOffset, agentVelocityOffset, this.mesh.itemSize, this.mesh.posOffset, this.mesh.uvOffset, presentationFormat
+      agentColorOffset, agentVelocityOffset, this.mesh.normalOffset, this.mesh.itemSize, this.mesh.posOffset, 
+      this.mesh.uvOffset, presentationFormat, this.bindGroupLayout
     );
   }
 
@@ -100,10 +111,12 @@ export class renderBufferManager {
     this.platformUniformBuffer = getUniformBuffer(this.device, 4 * 16);
     this.gridLinesUniformBuffer = getUniformBuffer(this.device, 4 * 16);
     this.crowdUniformBuffer = getUniformBuffer(this.device, 4 * 16);
+    this.u_CameraPosBuffer = getUniformBuffer(this.device, 4 * 4);
+    this.u_AgentScale = getUniformBuffer(this.device, 4 * 1);
 
     this.platformBindGroup = getUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer);
     this.gridLinesBindGroup = getUniformBindGroup(this.device, this.gridLinesPipeline, this.gridLinesUniformBuffer);
-    this.crowdBindGroup = getUniformBindGroup(this.device, this.crowdPipeline, this.crowdUniformBuffer);
+    this.crowdBindGroup = getCrowdUniformBindGroup(this.device, this.crowdPipeline, this.crowdUniformBuffer, this.u_CameraPosBuffer, this.u_AgentScale);
   }
   
   setRenderPassDescriptor(presentationSize) {
@@ -166,7 +179,7 @@ export class renderBufferManager {
     }
   }
 
-  drawCrowd(device: GPUDevice, mvp: mat4, passEncoder: GPURenderPassEncoder, agentsBuffer: GPUBuffer, numAgents: number) {
+  drawCrowd(device: GPUDevice, mvp: mat4, passEncoder: GPURenderPassEncoder, agentsBuffer: GPUBuffer, numAgents: number, cameraPos: vec4) {
       device.queue.writeBuffer(
         this.crowdUniformBuffer,
         0,
@@ -178,6 +191,22 @@ export class renderBufferManager {
           mvp[12], mvp[13], mvp[14], mvp[15],
         ])
       );
+      device.queue.writeBuffer(
+        this.u_CameraPosBuffer,
+        0,
+          new Float32Array([
+          // camera position
+          cameraPos[0], cameraPos[1], cameraPos[2], cameraPos[3]
+        ])
+      );
+      device.queue.writeBuffer(
+        this.u_AgentScale,
+        0,
+          new Float32Array([
+          // agent scale
+          this.mesh.scale
+        ])
+      );
       passEncoder.setPipeline(this.crowdPipeline);
       passEncoder.setBindGroup(0, this.crowdBindGroup);
       passEncoder.setVertexBuffer(0, agentsBuffer);
@@ -185,6 +214,35 @@ export class renderBufferManager {
       passEncoder.draw(this.mesh.vertexCount, numAgents, 0, 0);
       passEncoder.endPass();
   }  
+
+  setBindGroupLayout = () => {
+    // create bindgroup layout
+    this.bindGroupLayout = this.device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0, // viewproj matrix
+          visibility: GPUShaderStage.VERTEX,
+          buffer: {
+            type: "uniform"
+          }
+        },
+        {
+          binding: 1, // camera position
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: {
+            type: "uniform"
+          }
+        },
+        {
+          binding: 2, // agent scale
+          visibility: GPUShaderStage.VERTEX,
+          buffer: {
+            type: "uniform"
+          }
+        },
+      ]
+    });
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -260,8 +318,8 @@ const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryP
 }
 
 // TODO: There's probably a way to combine getCrowdRenderPipeline() with getPipeline()
-const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, velOffset: number,
-                                       vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
+const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, velOffset: number, vertNorOffset: number,
+                                       vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat, bindGroupLayout) => {
   const renderPipelineCrowd = device.createRenderPipeline({
     vertex: {
       module: device.createShaderModule({
@@ -291,7 +349,7 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
           shaderLocation: 2,
           offset: velOffset,
           format: 'float32x4'
-        }
+        },
       ],
     },
     {
@@ -309,6 +367,12 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
           offset: vertUVOffset,
           format: 'float32x2',
         },
+        {
+          // normal
+          shaderLocation: 5,
+          offset: vertNorOffset,
+          format: 'float32x4'
+        },
         ],
       },
       ],
@@ -324,6 +388,7 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
         },
       ],
     },
+    layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout]}),
     primitive: {
       topology: 'triangle-list',
       frontFace: 'cw'
@@ -356,16 +421,43 @@ const getUniformBuffer = (device: GPUDevice, size: number) => {
   return uniformBuffer;
 };
 
-const getUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uniformBuffer: GPUBuffer) => {
+const getUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uniformBuffer1: GPUBuffer) => {
   const uniformBindGroup = device.createBindGroup({
   layout: pipeline.getBindGroupLayout(0),
   entries: [
     {
       binding: 0,
       resource: {
-        buffer: uniformBuffer,
+        buffer: uniformBuffer1,
       },
     },
+  ],
+  });
+  return uniformBindGroup;
+}
+
+const getCrowdUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uniformBuffer1: GPUBuffer, uniformBuffer2: GPUBuffer, uniformBuffer3: GPUBuffer) => {
+  const uniformBindGroup = device.createBindGroup({
+  layout: pipeline.getBindGroupLayout(0),
+  entries: [
+    {
+      binding: 0,
+      resource: {
+        buffer: uniformBuffer1,
+      },
+    },
+    {
+      binding: 1,
+      resource: {
+        buffer: uniformBuffer2,
+      },
+    },
+    {
+      binding: 2,
+      resource: {
+        buffer: uniformBuffer3
+      }
+    }
   ],
   });
   return uniformBindGroup;

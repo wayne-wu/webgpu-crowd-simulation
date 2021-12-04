@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 import { makeSample, SampleInit } from '../../components/SampleLayout';
 import Camera from "./Camera";
 
@@ -15,6 +15,7 @@ import constraintSolveWGSL from '../../shaders/constraintSolve.compute.wgsl';
 import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.compute.wgsl';
 
 import {loadModel, Mesh} from "../../meshes/mesh";
+import { meshDictionary } from './meshDictionary';
 
 let camera : Camera;
 let aspect : number;
@@ -169,6 +170,12 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
+  const modelParams = {
+    model: 'Duck'
+  }
+  let prevModel = 'Duck';
+  gui.add(modelParams, 'model', ['Archer', 'Duck', 'Cesium Man']);
+
 
   /////////////////////////////////////////////////////////////////////////
   //                     Initial Context Setup                           //
@@ -205,16 +212,18 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   var renderBuffManager : renderBufferManager;
 
   var bufManagerExists = false;
-  loadModel('Duck.glb').then((mesh : Mesh) => {
+  var modelData = meshDictionary[modelParams.model];
+  loadModel(modelData.filename).then((mesh : Mesh) => {
+    mesh.scale = modelData.scale;
     renderBuffManager = new renderBufferManager(device, guiParams.gridWidth, 
       presentationFormat, presentationSize,
       compBuffManager.agentInstanceSize,
       compBuffManager.agentPositionOffset, 
-      compBuffManager.agentColorOffset, compBuffManager.agentVelocityOffset, mesh);
+      compBuffManager.agentColorOffset, compBuffManager.agentVelocityOffset, 
+      mesh, camera.controls.position);
     
     bufManagerExists = true;
   });
-  
 
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
@@ -291,6 +300,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   function getCrowdTransform() {
     const modelViewProjectionMatrix = mat4.create();
+
     mat4.multiply(modelViewProjectionMatrix, camera.projectionMatrix, camera.viewMatrix);
     return modelViewProjectionMatrix;
   }
@@ -304,6 +314,23 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     if (prevGridWidth != guiParams.gridWidth) {
       renderBuffManager.resetGridLinesBuffer(guiParams.gridWidth);
       prevGridWidth = guiParams.gridWidth;
+    }
+
+    if (prevModel != modelParams.model) {
+      bufManagerExists = false;
+      prevModel = modelParams.model;
+      var modelData = meshDictionary[modelParams.model];
+      loadModel(modelData.filename).then((mesh : Mesh) => {
+        mesh.scale = modelData.scale;
+        renderBuffManager = new renderBufferManager(device, guiParams.gridWidth, 
+        presentationFormat, presentationSize,
+        compBuffManager.agentInstanceSize,
+        compBuffManager.agentPositionOffset, 
+        compBuffManager.agentColorOffset, compBuffManager.agentVelocityOffset, 
+        mesh, camera.controls.position);
+    
+        bufManagerExists = true;
+      });
     }
 
     camera.update();
@@ -376,7 +403,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       // ----------------------- Draw ------------------------- //
       renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder);
       renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder, guiParams.gridOn);
-      renderBuffManager.drawCrowd(device, getCrowdTransform(), passEncoder, compBuffManager.agentsBuffer, simulationParams.numAgents);
+      renderBuffManager.drawCrowd(device, getCrowdTransform(), passEncoder, compBuffManager.agentsBuffer, simulationParams.numAgents, vec4.fromValues(camera.controls.eye[0], camera.controls.eye[1], camera.controls.eye[2], 1) );
 
     }      
     device.queue.submit([commandEncoder.finish()]);
