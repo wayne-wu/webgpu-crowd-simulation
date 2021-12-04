@@ -14,6 +14,7 @@ import contactSolveWGSL from '../../shaders/contactSolve.compute.wgsl';
 import constraintSolveWGSL from '../../shaders/constraintSolve.compute.wgsl';
 import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.compute.wgsl';
 
+import {loadModel, Mesh} from "../../meshes/mesh";
 
 let camera : Camera;
 let aspect : number;
@@ -201,11 +202,19 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //////////////////////////////////////////////////////////////////////////
   //                Render Buffer and Pipeline Setup                      //
   //////////////////////////////////////////////////////////////////////////
-  var renderBuffManager = new renderBufferManager(device, guiParams.gridWidth, 
-                                                  presentationFormat, presentationSize,
-                                                  compBuffManager.agentInstanceSize,
-                                                  compBuffManager.agentPositionOffset, 
-                                                  compBuffManager.agentColorOffset);
+  var renderBuffManager : renderBufferManager;
+
+  var bufManagerExists = false;
+  loadModel('Duck.glb').then((mesh : Mesh) => {
+    renderBuffManager = new renderBufferManager(device, guiParams.gridWidth, 
+      presentationFormat, presentationSize,
+      compBuffManager.agentInstanceSize,
+      compBuffManager.agentPositionOffset, 
+      compBuffManager.agentColorOffset, mesh);
+    
+    bufManagerExists = true;
+  });
+  
 
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
@@ -355,7 +364,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     }
     // ------------------ Render Calls ------------------------- //
-    {
+    if (bufManagerExists) {
       const transformationMatrix = getTransformationMatrix();
 
       renderBuffManager.renderPassDescriptor.colorAttachments[0].view = context

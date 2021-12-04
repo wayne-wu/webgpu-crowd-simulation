@@ -26,7 +26,7 @@ import {
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
 import { mat4 } from 'gl-matrix';
-import { meshVertexArray } from '../../meshes/mesh';
+import { Mesh } from '../../meshes/mesh';
 
 export class renderBufferManager {
 
@@ -51,10 +51,14 @@ export class renderBufferManager {
 
   renderPassDescriptor    : GPURenderPassDescriptor;
 
+  mesh : Mesh;
+
   constructor (device: GPUDevice, gridWidth: number, presentationFormat, presentationSize,
-               agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset: number) 
+               agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset: number, mesh : Mesh) 
   {
     this.device = device;
+    this.mesh = mesh;
+    console.log(mesh);
     this.initBuffers(gridWidth);
     this.buildPipelines(presentationFormat, agentInstanceByteSize, agentPositionOffset, agentColorOffset);
     this.setBindGroups();
@@ -71,7 +75,7 @@ export class renderBufferManager {
 
     this.prototypeVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
 
-    this.meshVertexBuffer = getVerticesBuffer(this.device, meshVertexArray);
+    this.meshVertexBuffer = getVerticesBuffer(this.device, this.mesh.vertexArray);
   }
 
   buildPipelines(presentationFormat, agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset:number) {
@@ -88,7 +92,7 @@ export class renderBufferManager {
 
     this.crowdPipeline = getCrowdRenderPipeline(
       this.device, crowdWGSL, agentInstanceByteSize, agentPositionOffset, 
-      agentColorOffset, cubeVertexSize, cubePositionOffset, cubeUVOffset, presentationFormat
+      agentColorOffset, this.mesh.itemSize, this.mesh.posOffset, this.mesh.uvOffset, presentationFormat
     );
   }
 
@@ -177,8 +181,8 @@ export class renderBufferManager {
       passEncoder.setPipeline(this.crowdPipeline);
       passEncoder.setBindGroup(0, this.crowdBindGroup);
       passEncoder.setVertexBuffer(0, agentsBuffer);
-      passEncoder.setVertexBuffer(1, this.prototypeVertexBuffer);
-      passEncoder.draw(cubeVertexCount, numAgents, 0, 0);
+      passEncoder.setVertexBuffer(1, this.meshVertexBuffer);
+      passEncoder.draw(this.mesh.vertexCount, numAgents, 0, 0);
       passEncoder.endPass();
   }  
 };
@@ -316,10 +320,11 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
     },
     primitive: {
       topology: 'triangle-list',
+      frontFace: 'cw'
     },
 
     depthStencil: {
-      depthWriteEnabled: false,
+      depthWriteEnabled: true,
       depthCompare: 'less',
       format: 'depth24plus',
     },

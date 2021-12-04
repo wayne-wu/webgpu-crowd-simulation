@@ -36,9 +36,9 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 
   // TODO: How to construct mat4x4?
   var model = mat4x4<f32>();
-  model[0] = vec4<f32>(0.1, 0.0, 0.0, 0.0);
-  model[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
-  model[2] = vec4<f32>(0.0, 0.0, 0.1, 0.0);
+  model[0] = vec4<f32>(0.008, 0.0, 0.0, 0.0);
+  model[1] = vec4<f32>(0.0, 0.008, 0.0, 0.0);
+  model[2] = vec4<f32>(0.0, 0.0, 0.008, 0.0);
   model[3] = vec4<f32>(in.position, 1.0);
 
   var out : VertexOutput;  
@@ -54,6 +54,8 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 ////////////////////////////////////////////////////////////////////////////////
 [[stage(fragment)]]
 fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
+  var lightPos = vec4<f32>(1, 1, 1);
+  //var lambert = 
   return in.color;
 }
 
