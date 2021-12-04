@@ -25,36 +25,42 @@ import {
 
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
+import obstaclesWGSL from '../../shaders/obstacles.render.wgsl'
 import { mat4 } from 'gl-matrix';
+import { ComputeBufferManager } from './crowdUtils';
 
-export class renderBufferManager {
+export class RenderBufferManager {
 
   device : GPUDevice;
 
   platformVertexBuffer    : GPUBuffer;
   gridLinesVertexBuffer   : GPUBuffer;
   prototypeVertexBuffer   : GPUBuffer;
+  obstacleVertexBuffer    : GPUBuffer;
 
   platformPipeline        : GPURenderPipeline;
   gridLinesPipeline       : GPURenderPipeline;
   crowdPipeline           : GPURenderPipeline;
+  obstaclesPipeline       : GPURenderPipeline;
 
+  commonUniformBuffer     : GPUBuffer;
   platformUniformBuffer   : GPUBuffer;
   gridLinesUniformBuffer  : GPUBuffer;
   crowdUniformBuffer      : GPUBuffer;
+  obstaclesUniformBuffer  : GPUBuffer;
 
   platformBindGroup       : GPUBindGroup;
   gridLinesBindGroup      : GPUBindGroup;
   crowdBindGroup          : GPUBindGroup;
+  obstaclesBindGroup      : GPUBindGroup;
 
   renderPassDescriptor    : GPURenderPassDescriptor;
 
-  constructor (device: GPUDevice, gridWidth: number, presentationFormat, presentationSize,
-               agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset: number) 
+  constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager) 
   {
     this.device = device;
     this.initBuffers(gridWidth);
-    this.buildPipelines(presentationFormat, agentInstanceByteSize, agentPositionOffset, agentColorOffset);
+    this.buildPipelines(presentationFormat, cbm);
     this.setBindGroups();
     this.setRenderPassDescriptor(presentationSize);
   }
@@ -68,9 +74,10 @@ export class renderBufferManager {
     this.gridLinesVertexBuffer = getVerticesBuffer(this.device, gridLinesVertexArray);
 
     this.prototypeVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
+    this.obstacleVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
   }
 
-  buildPipelines(presentationFormat, agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset:number) {
+  buildPipelines(presentationFormat, cbm: ComputeBufferManager) {
 
     this.platformPipeline = getPipeline(
       this.device, renderWGSL, 'vs_main', 'fs_platform', platformVertexSize,
@@ -83,19 +90,28 @@ export class renderBufferManager {
     );
 
     this.crowdPipeline = getCrowdRenderPipeline(
-      this.device, crowdWGSL, agentInstanceByteSize, agentPositionOffset, 
-      agentColorOffset, cubeVertexSize, cubePositionOffset, cubeUVOffset, presentationFormat
+      this.device, crowdWGSL, cbm.agentInstanceSize, cbm.agentPositionOffset, 
+      cbm.agentColorOffset, cubeVertexSize, cubePositionOffset, cubeUVOffset, presentationFormat
     );
+
+    this.obstaclesPipeline = getObstaclesRenderPipeline(
+      this.device, obstaclesWGSL, cbm.obstacleInstanceSize, 0, 
+      cubeVertexSize, cubePositionOffset, cubeUVOffset, presentationFormat);
   }
 
   setBindGroups() {
-    this.platformUniformBuffer = getUniformBuffer(this.device, 4 * 16);
-    this.gridLinesUniformBuffer = getUniformBuffer(this.device, 4 * 16);
-    this.crowdUniformBuffer = getUniformBuffer(this.device, 4 * 16);
+    // NOTE: Is there really no way to share the same uniform buffer across different pipelines?
+    // Seems very efficient to have to redeclare pretty much the same data multiple times
+    let mvpSize = 4 * 16;  // mat4
+    this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize);
+    this.gridLinesUniformBuffer = getUniformBuffer(this.device, mvpSize);
+    this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize);
+    this.obstaclesUniformBuffer = getUniformBuffer(this.device, mvpSize);
 
     this.platformBindGroup = getUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer);
     this.gridLinesBindGroup = getUniformBindGroup(this.device, this.gridLinesPipeline, this.gridLinesUniformBuffer);
     this.crowdBindGroup = getUniformBindGroup(this.device, this.crowdPipeline, this.crowdUniformBuffer);
+    this.obstaclesBindGroup = getUniformBindGroup(this.device, this.obstaclesPipeline, this.obstaclesUniformBuffer);
   }
   
   setRenderPassDescriptor(presentationSize) {
@@ -142,41 +158,49 @@ export class renderBufferManager {
     passEncoder.draw(platformVertexCount, 1, 0, 0);
   }
 
-  drawGridLines(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder, gridOn: boolean) {
-    if (gridOn){
-      device.queue.writeBuffer(
-        this.gridLinesUniformBuffer,
-        0,
-        transformationMatrix.buffer,
-        transformationMatrix.byteOffset,
-        transformationMatrix.byteLength
-      );
-      passEncoder.setPipeline(this.gridLinesPipeline);
-      passEncoder.setBindGroup(0, this.gridLinesBindGroup);
-      passEncoder.setVertexBuffer(0, this.gridLinesVertexBuffer);
-      passEncoder.draw(gridLinesVertexCount, 1, 0, 0);
-    }
+  drawGridLines(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder) {
+    device.queue.writeBuffer(
+      this.gridLinesUniformBuffer,
+      0,
+      transformationMatrix.buffer,
+      transformationMatrix.byteOffset,
+      transformationMatrix.byteLength
+    );
+    passEncoder.setPipeline(this.gridLinesPipeline);
+    passEncoder.setBindGroup(0, this.gridLinesBindGroup);
+    passEncoder.setVertexBuffer(0, this.gridLinesVertexBuffer);
+    passEncoder.draw(gridLinesVertexCount, 1, 0, 0);
   }
 
-  drawCrowd(device: GPUDevice, mvp: mat4, passEncoder: GPURenderPassEncoder, agentsBuffer: GPUBuffer, numAgents: number) {
-      device.queue.writeBuffer(
-        this.crowdUniformBuffer,
-        0,
-          new Float32Array([
-          // modelViewProjectionMatrix
-          mvp[0],  mvp[1],  mvp[2],  mvp[3],
-          mvp[4],  mvp[5],  mvp[6],  mvp[7],
-          mvp[8],  mvp[9],  mvp[10], mvp[11],
-          mvp[12], mvp[13], mvp[14], mvp[15],
-        ])
-      );
-      passEncoder.setPipeline(this.crowdPipeline);
-      passEncoder.setBindGroup(0, this.crowdBindGroup);
-      passEncoder.setVertexBuffer(0, agentsBuffer);
-      passEncoder.setVertexBuffer(1, this.prototypeVertexBuffer);
-      passEncoder.draw(cubeVertexCount, numAgents, 0, 0);
-      passEncoder.endPass();
-  }  
+  drawCrowd(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, agentsBuffer: GPUBuffer, numAgents: number) {
+    device.queue.writeBuffer(
+      this.crowdUniformBuffer,
+      0,
+      mvp.buffer,
+      mvp.byteOffset,
+      mvp.byteLength
+    );
+    passEncoder.setPipeline(this.crowdPipeline);
+    passEncoder.setBindGroup(0, this.crowdBindGroup);
+    passEncoder.setVertexBuffer(0, agentsBuffer);
+    passEncoder.setVertexBuffer(1, this.prototypeVertexBuffer);
+    passEncoder.draw(cubeVertexCount, numAgents, 0, 0);
+  }
+  
+  drawObstacles(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, obstaclesBuffer: GPUBuffer, numObstacles: number) {
+    device.queue.writeBuffer(
+      this.obstaclesUniformBuffer,
+      0,
+      mvp.buffer,
+      mvp.byteOffset,
+      mvp.byteLength
+    );
+    passEncoder.setPipeline(this.obstaclesPipeline);
+    passEncoder.setBindGroup(0, this.obstaclesBindGroup);
+    passEncoder.setVertexBuffer(0, obstaclesBuffer);
+    passEncoder.setVertexBuffer(1, this.obstacleVertexBuffer);
+    passEncoder.draw(cubeVertexCount, numObstacles, 0, 0);
+  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -195,72 +219,72 @@ const getVerticesBuffer = (device: GPUDevice, vertexArray: Float32Array) => {
   return vertexBuffer;
 }
 
-// Create a pipeline given the parameters
-const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryPoint: string, 
-                            arrayStride: number, posOffset: number, uvOffset: number, presentationFormat, primitiveType, cullMode) => {
-  const pipeline = device.createRenderPipeline({
+const getPipelineDescriptor = (device: GPUDevice, code, vs: string, fs: string, 
+  vertexBuffers, presentationFormat: GPUTextureFormat, primitiveType: GPUPrimitiveTopology, cullMode: GPUCullMode) => {
+
+  let descriptor : GPURenderPipelineDescriptor = {
     vertex: {
-      module: device.createShaderModule({
-      code: code,
-    }),
-    entryPoint: vertEntryPoint,
-      buffers: [
-      {
-        arrayStride: arrayStride,
-        attributes: [
-          {
-            // position
-            shaderLocation: 0,
-            offset: posOffset,
-            format: 'float32x4',
-          },
-          {
-            // uv
-            shaderLocation: 1,
-            offset: uvOffset,
-            format: 'float32x2',
-          },
-        ],
-      },
-      ],
+      module: device.createShaderModule({code: code}),
+      entryPoint: vs,
+      buffers: vertexBuffers,
     },
-    fragment: {
-      module: device.createShaderModule({
-        code: code,
-      }),
-      entryPoint: fragEntryPoint,
+    fragment : {
+      module: device.createShaderModule({code: code}),
+      entryPoint: fs,
       targets: [
-      {
-        format: presentationFormat,
-      },
-      ],
+        {
+          format: presentationFormat,
+        },
+      ]
     },
     primitive: {
       topology: primitiveType,
       cullMode: cullMode,
     },
-
     // Enable depth testing so that the fragment closest to the camera
     // is rendered in front.
     depthStencil: {
       depthWriteEnabled: true,
-      depthCompare: 'less',
-      format: 'depth24plus',
+      depthCompare: <GPUCompareFunction>'less',
+      format: <GPUTextureFormat>'depth24plus',
     },
-  });
+  };
+  return descriptor;
+
+}
+
+// Create a pipeline given the parameters
+const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryPoint: string, 
+                            arrayStride: number, posOffset: number, uvOffset: number, presentationFormat, primitiveType, cullMode) => {
+  let buffers = [
+    {
+      arrayStride: arrayStride,
+      attributes: [
+        {
+          // position
+          shaderLocation: 0,
+          offset: posOffset,
+          format: 'float32x4',
+        },
+        {
+          // uv
+          shaderLocation: 1,
+          offset: uvOffset,
+          format: 'float32x2',
+        },
+      ],
+    },
+  ]
+  
+  const pipeline = device.createRenderPipeline(
+    getPipelineDescriptor(device, code, vertEntryPoint, fragEntryPoint, buffers, presentationFormat, primitiveType, cullMode));
   return pipeline;
 }
 
-// TODO: There's probably a way to combine getCrowdRenderPipeline() with getPipeline()
 const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, 
-                                       vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
-  const renderPipelineCrowd = device.createRenderPipeline({
-    vertex: {
-      module: device.createShaderModule({
-        code: code,
-      }),
-    entryPoint: 'vs_main',
-    buffers: [
+                                vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
+
+  let buffers = [
     {
       // instanced agents buffer
       arrayStride: arrayStride,
@@ -295,33 +319,66 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
           offset: vertUVOffset,
           format: 'float32x2',
         },
-        ],
-      },
       ],
     },
-    fragment: {
-      module: device.createShaderModule({
-        code: code,
-      }),
-      entryPoint: 'fs_main',
-      targets: [
+  ]
+
+  const renderPipelineCrowd = device.createRenderPipeline(
+    getPipelineDescriptor(device, code, "vs_main", "fs_main", buffers, presentationFormat, "triangle-list", "back"));
+
+  return renderPipelineCrowd;
+};
+
+const getObstaclesRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, 
+  vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
+  let buffers = [
+    {
+      arrayStride: arrayStride,
+      stepMode: 'instance',
+      attributes: [
         {
-          format: presentationFormat,
+          // position
+          shaderLocation: 0,
+          offset: 0,
+          format: 'float32x3',
+        },
+        {
+          // rotation-y
+          shaderLocation: 1,
+          offset: 3*4,
+          format: 'float32',
+        },
+        {
+          // scale
+          shaderLocation: 2,
+          offset: 4*4,
+          format: 'float32x3',
         },
       ],
     },
-    primitive: {
-      topology: 'triangle-list',
+    {
+      arrayStride: vertArrayStride,
+      attributes: [
+        {
+          // position
+          shaderLocation: 3,
+          offset: vertPosOffset,
+          format: 'float32x4',
+        },
+        {
+          // uv
+          shaderLocation: 4,
+          offset: vertUVOffset,
+          format: 'float32x2',
+        },
+      ],
     },
+  ];
 
-    depthStencil: {
-      depthWriteEnabled: false,
-      depthCompare: 'less',
-      format: 'depth24plus',
-    },
-  });
-  return renderPipelineCrowd;
-};
+  const pipeline = device.createRenderPipeline(
+    getPipelineDescriptor(device, code, "vs_main", "fs_main", buffers, presentationFormat, "triangle-list", "back"));
+  return pipeline;
+}
 
 const getDepthTexture = (device: GPUDevice, presentationSize) => {
   const depthTexture = device.createTexture({

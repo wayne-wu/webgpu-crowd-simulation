@@ -3,7 +3,7 @@ import { makeSample, SampleInit } from '../../components/SampleLayout';
 import Camera from "./Camera";
 
 import { ComputeBufferManager } from './crowdUtils';
-import { renderBufferManager } from './renderUtils';
+import { RenderBufferManager } from './renderUtils';
 
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
@@ -13,6 +13,7 @@ import findNeighborsWGSL from '../../shaders/findNeighbors.compute.wgsl';
 import contactSolveWGSL from '../../shaders/contactSolve.compute.wgsl';
 import constraintSolveWGSL from '../../shaders/constraintSolve.compute.wgsl';
 import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.compute.wgsl';
+import { render } from 'react-dom';
 
 
 let camera : Camera;
@@ -153,7 +154,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const simulationParams = {
     simulate: true,
     deltaTime: 0.02,
-    numAgents: 1024,
+    numAgents: 100,
     avoidance: false,
     resetSimulation: () => { resetSim = true; }
   };
@@ -201,11 +202,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //////////////////////////////////////////////////////////////////////////
   //                Render Buffer and Pipeline Setup                      //
   //////////////////////////////////////////////////////////////////////////
-  var renderBuffManager = new renderBufferManager(device, guiParams.gridWidth, 
+  var renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
                                                   presentationFormat, presentationSize,
-                                                  compBuffManager.agentInstanceSize,
-                                                  compBuffManager.agentPositionOffset, 
-                                                  compBuffManager.agentColorOffset);
+                                                  compBuffManager);
 
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
@@ -280,10 +279,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     return modelViewProjectionMatrix as Float32Array;
   }
 
-  function getCrowdTransform() {
+  function getViewProjection() {
     const modelViewProjectionMatrix = mat4.create();
     mat4.multiply(modelViewProjectionMatrix, camera.projectionMatrix, camera.viewMatrix);
-    return modelViewProjectionMatrix;
+    return modelViewProjectionMatrix as Float32Array;
   }
   
   function frame() {
@@ -366,10 +365,16 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       // ----------------------- Draw ------------------------- //
       renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder);
-      renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder, guiParams.gridOn);
-      renderBuffManager.drawCrowd(device, getCrowdTransform(), passEncoder, compBuffManager.agentsBuffer, simulationParams.numAgents);
+      if (guiParams.gridOn)
+        renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder);
 
-    }      
+      const vp = getViewProjection();
+      renderBuffManager.drawCrowd(device, vp, passEncoder, compBuffManager.agentsBuffer, compBuffManager.numAgents);
+      renderBuffManager.drawObstacles(device, vp, passEncoder, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
+
+      passEncoder.endPass();
+    }
+
     device.queue.submit([commandEncoder.finish()]);
     requestAnimationFrame(frame);
     stats.end();

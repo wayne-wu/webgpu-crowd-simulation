@@ -1,3 +1,5 @@
+import { mat4, vec3 } from "gl-matrix";
+
 const scatterWidth = 100;
 const diskRadius = 0.5;
 const invMass = 0.5;
@@ -6,6 +8,7 @@ const minY = 0.5;
 
 export class ComputeBufferManager {
   numAgents : number;
+  numObstacles : number;
 
   // buffer sizes
   simulationUBOBufferSize : number;
@@ -16,12 +19,17 @@ export class ComputeBufferManager {
   agentColorOffset : number;
   cellInstanceSize : number;
 
+  obstacleInstanceSize : number;
+  obstaclePositionOffset : number;
+
   device : GPUDevice;
 
   // buffers
   simulationUBOBuffer : GPUBuffer;
   agentsBuffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
   cellsBuffer : GPUBuffer;            // start / end indices for each cell (in pairs)
+  
+  obstaclesBuffer : GPUBuffer;
 
   // bind group layout
   bindGroupLayout : GPUBindGroupLayout;
@@ -50,8 +58,14 @@ export class ComputeBufferManager {
     this.agentColorOffset = 4 * 4;
 
     this.numAgents = numAgents;
-
-    // --- set buffer sizes ---
+    
+    this.numObstacles = 1;
+    this.obstacleInstanceSize =
+      3 * 4 + // position
+      1 * 4 + // rotation-y
+      3 * 4 + // scale
+      1 * 4 + // padding
+      0;
 
     this.simulationUBOBufferSize =
       1 * 4 + // deltaTime
@@ -98,24 +112,15 @@ export class ComputeBufferManager {
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       mappedAtCreation: false
     });
-  }
 
-  setGoal(){
-
-    // a buffer of a single vec3 is padded into a vec4
-    let goalDataSize = 4;
-    const initialGoalData = new Float32Array(this.numAgents * goalDataSize);  
-
-    let direction = -1;
-    for (let i = 0; i < this.numAgents; ++i) {
-          initialGoalData[i * goalDataSize + 0] = Math.random() * 0.5 * 2 - 1;
-          initialGoalData[i * goalDataSize + 1] = 0.0;
-          initialGoalData[i * goalDataSize + 2] = Math.random() * direction;
-          if (i > this.numAgents/2){
-            direction = 1
-          }
-    }
-
+    let obstacleData = this.initObstacles(this.numObstacles);
+    this.obstaclesBuffer = this.device.createBuffer({
+      size: this.numObstacles * this.obstacleInstanceSize,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+      mappedAtCreation: true
+    });
+    new Float32Array(this.obstaclesBuffer.getMappedRange()).set(obstacleData);
+    this.obstaclesBuffer.unmap();
   }
 
   writeSimParams(simulationParams){
@@ -154,12 +159,12 @@ export class ComputeBufferManager {
         }
       },
       {
-        binding: 2, // cellsBuffer
+        binding: 2, // obstacleBuffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
         }
-      },
+      }
     ]
   });
   }
@@ -185,14 +190,35 @@ export class ComputeBufferManager {
         {
           binding: 2,
           resource: {
-            buffer: this.cellsBuffer,
+            buffer: this.obstaclesBuffer,
             offset: 0,
-            size: this.gridWidth * this.gridHeight * this.cellInstanceSize,
+            size: this.numObstacles * this.obstacleInstanceSize,
           },
-        },
+        }
       ],
     });
     return computeBindGroup;
+  }
+
+  // Initialize obstacles
+  initObstacles(numObstacles: number) {
+    const obstacleData = new Float32Array(numObstacles * this.obstacleInstanceSize / 4);
+
+    for(let i = 0; i < numObstacles; i++){
+      let offset = this.obstacleInstanceSize * i / 4;
+
+      obstacleData[offset + 0] = 0; //100*(Math.random()-0.5);
+      obstacleData[offset + 1] = minY;
+      obstacleData[offset + 2] = 0;
+
+      obstacleData[offset + 3] = 0.785; //rotation
+
+      obstacleData[offset + 4] = 3.0;
+      obstacleData[offset + 5] = 1.0;
+      obstacleData[offset + 6] = 3.0;
+    }
+    
+    return obstacleData;
   }
 
   getAgentData(numAgents: number){
@@ -246,8 +272,8 @@ export class ComputeBufferManager {
   initAgentsProximity(numAgents : number) {
     const initialAgentData = new Float32Array(numAgents * this.agentInstanceSize / 4);
     for (let i = 0; i < numAgents/2; ++i) {
-      let x = i%100 - 50;
-      let z = Math.floor(i/100) + 5;
+      let x = i%10 - 5;
+      let z = Math.floor(i/10) + 10;
       let v = 0.5;
       this.setAgentData(
         initialAgentData, 2*i,
