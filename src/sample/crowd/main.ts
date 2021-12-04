@@ -210,7 +210,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       presentationFormat, presentationSize,
       compBuffManager.agentInstanceSize,
       compBuffManager.agentPositionOffset, 
-      compBuffManager.agentColorOffset, mesh);
+      compBuffManager.agentColorOffset, compBuffManager.agentVelocityOffset, mesh);
     
     bufManagerExists = true;
   });

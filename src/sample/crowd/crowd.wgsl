@@ -20,8 +20,9 @@ fn rand() -> f32 {
 struct VertexInput {
   [[location(0)]] position : vec3<f32>;  // agent position (world space)
   [[location(1)]] color    : vec4<f32>;  // agent color
-  [[location(2)]] mesh_pos : vec4<f32>;  // mesh vertex position (model space)
-  [[location(3)]] mesh_uv  : vec2<f32>;  // mesh vertex uv
+  [[location(2)]] velocity : vec4<f32>;  // agent velocity
+  [[location(3)]] mesh_pos : vec4<f32>;  // mesh vertex position (model space)
+  [[location(4)]] mesh_uv  : vec2<f32>;  // mesh vertex uv
 };
 
 struct VertexOutput {
@@ -34,12 +35,32 @@ struct VertexOutput {
 [[stage(vertex)]]
 fn vs_main(in : VertexInput) -> VertexOutput {
 
+  var vel = normalize(in.velocity);
+  //vel.y = 0.0;
   // TODO: How to construct mat4x4?
   var model = mat4x4<f32>();
-  model[0] = vec4<f32>(0.008, 0.0, 0.0, 0.0);
-  model[1] = vec4<f32>(0.0, 0.008, 0.0, 0.0);
-  model[2] = vec4<f32>(0.0, 0.0, 0.008, 0.0);
-  model[3] = vec4<f32>(in.position, 1.0);
+  var scale = mat4x4<f32>();
+  scale[0] = vec4<f32>(0.005, 0.0, 0.0, 0.0);
+  scale[1] = vec4<f32>(0.0, 0.005, 0.0, 0.0);
+  scale[2] = vec4<f32>(0.0, 0.0, 0.005, 0.0);
+  scale[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+
+  var rot = mat4x4<f32>();
+  var right = vel;
+  var up = vec4<f32>(0.0, 1.0, 0.0, 0.0);
+  var forward = normalize(vec4<f32>(cross(right.xyz, up.xyz), 0.0));
+  rot[0] = right;
+  rot[1] = up;
+  rot[2] = forward;
+  rot[3] = scale[3];
+
+  var trans = mat4x4<f32>();
+  trans[0] = vec4<f32>(1.0, 0.0, 0.0, 0.0);
+  trans[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
+  trans[2] = vec4<f32>(0.0, 0.0, 1.0, 0.0);
+  trans[3] = vec4<f32>(in.position, 1.0);
+
+  model = trans * rot * scale;
 
   var out : VertexOutput;  
   out.position = render_params.modelViewProjectionMatrix * model * in.mesh_pos;
@@ -54,7 +75,7 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 ////////////////////////////////////////////////////////////////////////////////
 [[stage(fragment)]]
 fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
-  var lightPos = vec4<f32>(1, 1, 1);
+  //var lightPos = vec4<f32>(1, 1, 1);
   //var lambert = 
   return in.color;
 }

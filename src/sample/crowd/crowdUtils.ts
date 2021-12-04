@@ -14,6 +14,7 @@ export class ComputeBufferManager {
   agentInstanceSize : number;
   agentPositionOffset : number;
   agentColorOffset : number;
+  agentVelocityOffset: number;
   cellInstanceSize : number;
 
   device : GPUDevice;
@@ -48,6 +49,7 @@ export class ComputeBufferManager {
 
     this.agentPositionOffset = 0;
     this.agentColorOffset = 4 * 4;
+    this.agentVelocityOffset = 8 * 4;
 
     this.numAgents = numAgents;
 

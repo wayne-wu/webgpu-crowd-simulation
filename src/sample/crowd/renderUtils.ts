@@ -54,13 +54,13 @@ export class renderBufferManager {
   mesh : Mesh;
 
   constructor (device: GPUDevice, gridWidth: number, presentationFormat, presentationSize,
-               agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset: number, mesh : Mesh) 
+               agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset: number, 
+               agentVelocityOffset: number, mesh : Mesh) 
   {
     this.device = device;
     this.mesh = mesh;
-    console.log(mesh);
     this.initBuffers(gridWidth);
-    this.buildPipelines(presentationFormat, agentInstanceByteSize, agentPositionOffset, agentColorOffset);
+    this.buildPipelines(presentationFormat, agentInstanceByteSize, agentPositionOffset, agentColorOffset, agentVelocityOffset);
     this.setBindGroups();
     this.setRenderPassDescriptor(presentationSize);
   }
@@ -78,7 +78,7 @@ export class renderBufferManager {
     this.meshVertexBuffer = getVerticesBuffer(this.device, this.mesh.vertexArray);
   }
 
-  buildPipelines(presentationFormat, agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset:number) {
+  buildPipelines(presentationFormat, agentInstanceByteSize: number, agentPositionOffset: number, agentColorOffset: number, agentVelocityOffset: number) {
 
     this.platformPipeline = getPipeline(
       this.device, renderWGSL, 'vs_main', 'fs_platform', platformVertexSize,
@@ -92,7 +92,7 @@ export class renderBufferManager {
 
     this.crowdPipeline = getCrowdRenderPipeline(
       this.device, crowdWGSL, agentInstanceByteSize, agentPositionOffset, 
-      agentColorOffset, this.mesh.itemSize, this.mesh.posOffset, this.mesh.uvOffset, presentationFormat
+      agentColorOffset, agentVelocityOffset, this.mesh.itemSize, this.mesh.posOffset, this.mesh.uvOffset, presentationFormat
     );
   }
 
@@ -260,7 +260,7 @@ const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryP
 }
 
 // TODO: There's probably a way to combine getCrowdRenderPipeline() with getPipeline()
-const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, 
+const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, velOffset: number,
                                        vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
   const renderPipelineCrowd = device.createRenderPipeline({
     vertex: {
@@ -286,6 +286,12 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
           offset: colOffset,
           format: 'float32x4',
         },
+        {
+          // orientation
+          shaderLocation: 2,
+          offset: velOffset,
+          format: 'float32x4'
+        }
       ],
     },
     {
@@ -293,13 +299,13 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
       attributes: [
         {
           // position
-          shaderLocation: 2,
+          shaderLocation: 3,
           offset: vertPosOffset,
           format: 'float32x4',
         },
         {
           // uv
-          shaderLocation: 3,
+          shaderLocation: 4,
           offset: vertUVOffset,
           format: 'float32x2',
         },

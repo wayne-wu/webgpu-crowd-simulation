@@ -39,7 +39,6 @@ export function loadModel(gltfPath : string) {
 
                     for (let i = 0; i < gltfIdxArray.length; i++){
                         let idx = gltfIdxArray[i];
-                        console.log("idx: " + idx);
                         tmpMeshVertexArray[vertArrayIdx+0] = gltfArray[idx * 3 + 0];
                         tmpMeshVertexArray[vertArrayIdx+1] = gltfArray[idx * 3 + 1];
                         tmpMeshVertexArray[vertArrayIdx+2] = gltfArray[idx * 3 + 2];
@@ -49,17 +48,6 @@ export function loadModel(gltfPath : string) {
                         vertArrayIdx += 6;
                     }
 
-                    // for (let i = 0; i < vertCount; ++i){
-                    //     tmpMeshVertexArray[vertArrayIdx+0] = gltfArray[i * 3 + 0];
-                    //     tmpMeshVertexArray[vertArrayIdx+1] = gltfArray[i * 3 + 1];
-                    //     tmpMeshVertexArray[vertArrayIdx+2] = gltfArray[i * 3 + 2];
-                    //     tmpMeshVertexArray[vertArrayIdx+3] = 1;
-                    //     tmpMeshVertexArray[vertArrayIdx+4] = gltfUVArray[i * 2 + 0]; // tmp UV coords
-                    //     tmpMeshVertexArray[vertArrayIdx+5] = gltfUVArray[i * 2 + 1];
-                    //     vertArrayIdx += 6;
-                    // }
-                
-                    console.log(child.geometry);
                     let mesh = new Mesh(tmpMeshVertexArray, vertCount);
                     resolve(mesh);
                 }
