@@ -6,7 +6,7 @@ let maxIterations : i32 = 6;     // paper = 6
 let t0 : f32 = 20.0;             // paper = 20
 let tObstacle : f32 = 10.0;
 let kUser : f32 = 0.15;          // paper = 0.24 [0-1]
-let kObstacle : f32 = 0.5;
+let kObstacle : f32 = 1.0;
 let avgCoefficient : f32 = 1.2;  // paper = 1.2  [1-2]
 let farRadius : f32 = 5.0;
 
@@ -126,7 +126,6 @@ fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<func
       dx = d_tangent;
     }
 
-    // TODO: 4.2 Friction Model (See 6.1 of https://mmacklin.com/uppfrta_preprint.pdf)
     *totalDx = *totalDx + k * dx;
     *count = *count + 1;
   }

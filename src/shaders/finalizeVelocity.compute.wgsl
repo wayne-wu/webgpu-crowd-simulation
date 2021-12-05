@@ -113,7 +113,8 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   }
 
   // Set new position to be the corrected position
-  agent.x = agent.xp;
+  // Reintegrate here so that the position doesn't jump between frames
+  agent.x = agent.x + agent.v * sim_params.deltaTime;
   
   // Store the new agent value
   agentData.agents[idx] = agent;

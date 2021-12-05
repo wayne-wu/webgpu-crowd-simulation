@@ -6,6 +6,8 @@ let maxIterations : i32 = 1;  // paper = 1
 let stiffness : f32 = 1.0;  // paper = 1.0 [0,1]
 let avgCoefficient : f32 = 1.2;  // paper = 1.2 [1,2]
 let nearRadius : f32 = 2.0;
+let mu_static : f32 = 0.21;  // paper = 0.21
+let mu_kinematic : f32 = 0.15;
 
 [[block]] struct SimulationParams {
   deltaTime : f32;
@@ -46,7 +48,6 @@ struct CellIndices {
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
 
-  // 4.2 Short Range Collision
   var itr = 0;
   loop {
     if (itr == maxIterations){ break; }
@@ -97,24 +98,43 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
         let f = d - (agent.r + agent_j.r);
         if (f < 0.0) {
-          // Project Constraint
+          // 4.2 Short Range Collision
           n = normalize(n);
-          var dx = -agent.w * stiffness * f * n / (agent.w + agent_j.w);
+          let w = agent.w / (agent.w + agent_j.w);
+          var dx = -w * stiffness * f * n;
+          totalDx = totalDx + dx;
+          neighborCount = neighborCount + 1;
+
+          // 4.2 Friction Contact (See 6.1 of https://mmacklin.com/uppfrta_preprint.pdf)
+          // Add friction to slow down agents if collision is detected
+          
+          // Get corrected positions
+          var xi = agent.xp + dx; 
+          var xj = agent_j.xp - dx;  // assumes mass are the same
+
+          var d_rel = (xi - agent.x) - (xj - agent_j.x);
+          dx = d_rel - dot(d_rel, n) * n;  // project to tangential component
+          var dx_norm = length(dx); 
+          if(dx_norm >= mu_static * d) {
+            dx = min(mu_kinematic * d/dx_norm, 1.0) * dx;
+          }
+          dx = w * dx;
+
           totalDx = totalDx + dx;
           neighborCount = neighborCount + 1;
         }
       }
-    }
 
-    if (neighborCount > 0) {
-      // Constraint averaging: Not sure if this is needed yet
-      totalDx = avgCoefficient * totalDx / f32(neighborCount); 
-      
-      // Update position with correction
-      agent.x = agent.x + totalDx;
-      agent.xp = agent.xp + totalDx;
+      if (neighborCount > 0) {
+        // Constraint averaging: Not sure if this is needed yet
+        totalDx = avgCoefficient * totalDx / f32(neighborCount); 
+        
+        // Update position with correction
+        agent.x = agent.x + totalDx;
+        agent.xp = agent.xp + totalDx;
+      }
     }
-
+    
     // Store the new agent value
     agentData.agents[idx] = agent;
 
