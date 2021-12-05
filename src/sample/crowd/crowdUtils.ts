@@ -1,11 +1,25 @@
+import { mat4, vec3 } from "gl-matrix";
+
 const scatterWidth = 100;
 const diskRadius = 0.5;
 const invMass = 0.5;
 const minY = 0.5;
+const obstacleHeight = 2.0;
+
+
+export enum TestScene {
+  PROXIMAL = "proximal",
+  BOTTLENECK = "bottleneck",
+  DENSE = "dense",
+  SPARSE = "sparse",
+}
 
 
 export class ComputeBufferManager {
+  testScene : TestScene;
+
   numAgents : number;
+  numObstacles : number;
 
   // buffer sizes
   simulationUBOBufferSize : number;
@@ -16,12 +30,17 @@ export class ComputeBufferManager {
   agentColorOffset : number;
   cellInstanceSize : number;
 
+  obstacleInstanceSize : number;
+  obstaclePositionOffset : number;
+
   device : GPUDevice;
 
   // buffers
   simulationUBOBuffer : GPUBuffer;
   agentsBuffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
   cellsBuffer : GPUBuffer;            // start / end indices for each cell (in pairs)
+  
+  obstaclesBuffer : GPUBuffer;
 
   // bind group layout
   bindGroupLayout : GPUBindGroupLayout;
@@ -29,9 +48,11 @@ export class ComputeBufferManager {
   gridWidth : number;
   gridHeight : number;
 
-  constructor(device: GPUDevice, 
+  constructor(device: GPUDevice,
+              testScene: TestScene, 
               numAgents: number){
     this.device = device;
+    this.testScene = testScene;
     this.agentInstanceSize = 
     3 * 4 + // position
     1 * 4 + // radius
@@ -50,8 +71,14 @@ export class ComputeBufferManager {
     this.agentColorOffset = 4 * 4;
 
     this.numAgents = numAgents;
-
-    // --- set buffer sizes ---
+    
+    this.numObstacles = 1;
+    this.obstacleInstanceSize =
+      3 * 4 + // position
+      1 * 4 + // rotation-y
+      3 * 4 + // scale
+      1 * 4 + // padding
+      0;
 
     this.simulationUBOBufferSize =
       1 * 4 + // deltaTime
@@ -73,6 +100,25 @@ export class ComputeBufferManager {
   }
 
   initBuffers(){
+
+    const agentData = new Float32Array(this.numAgents * this.agentInstanceSize / 4); ;
+    const obstacleData = new Float32Array(this.numObstacles * this.obstacleInstanceSize / 4); ;
+
+    switch(this.testScene){
+      case TestScene.PROXIMAL:
+        this.initProximal(agentData, obstacleData);
+        break;
+      case TestScene.BOTTLENECK:
+        this.initBottleneck(agentData, obstacleData);
+        break;
+      case TestScene.DENSE:
+        this.initDense(agentData, obstacleData);
+        break;
+      case TestScene.SPARSE:
+        this.initSparse(agentData, obstacleData);
+        break;
+    }
+
     // simulation parameter buffer
     this.simulationUBOBuffer = this.device.createBuffer({
       size: this.simulationUBOBufferSize,
@@ -81,15 +127,12 @@ export class ComputeBufferManager {
 
     // agent buffer
     //let initialAgentData = this.getAgentData(this.numAgents);
-    let initialAgentData = this.initAgentsProximity(this.numAgents);
     this.agentsBuffer = this.device.createBuffer({
       size: this.numAgents * this.agentInstanceSize,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
       mappedAtCreation: true
     });
-    new Float32Array(this.agentsBuffer.getMappedRange()).set(
-      initialAgentData
-    );
+    new Float32Array(this.agentsBuffer.getMappedRange()).set(agentData);
     this.agentsBuffer.unmap(); 
  
     // cells buffer
@@ -98,24 +141,14 @@ export class ComputeBufferManager {
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       mappedAtCreation: false
     });
-  }
 
-  setGoal(){
-
-    // a buffer of a single vec3 is padded into a vec4
-    let goalDataSize = 4;
-    const initialGoalData = new Float32Array(this.numAgents * goalDataSize);  
-
-    let direction = -1;
-    for (let i = 0; i < this.numAgents; ++i) {
-          initialGoalData[i * goalDataSize + 0] = Math.random() * 0.5 * 2 - 1;
-          initialGoalData[i * goalDataSize + 1] = 0.0;
-          initialGoalData[i * goalDataSize + 2] = Math.random() * direction;
-          if (i > this.numAgents/2){
-            direction = 1
-          }
-    }
-
+    this.obstaclesBuffer = this.device.createBuffer({
+      size: this.numObstacles * this.obstacleInstanceSize,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+      mappedAtCreation: true
+    });
+    new Float32Array(this.obstaclesBuffer.getMappedRange()).set(obstacleData);
+    this.obstaclesBuffer.unmap();
   }
 
   writeSimParams(simulationParams){
@@ -154,12 +187,12 @@ export class ComputeBufferManager {
         }
       },
       {
-        binding: 2, // cellsBuffer
+        binding: 2, // obstacleBuffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
         }
-      },
+      }
     ]
   });
   }
@@ -185,35 +218,28 @@ export class ComputeBufferManager {
         {
           binding: 2,
           resource: {
-            buffer: this.cellsBuffer,
+            buffer: this.obstaclesBuffer,
             offset: 0,
-            size: this.gridWidth * this.gridHeight * this.cellInstanceSize,
+            size: this.numObstacles * this.obstacleInstanceSize,
           },
-        },
+        }
       ],
     });
     return computeBindGroup;
   }
 
-  getAgentData(numAgents: number){
-    //48 is total byte size of each agent
-    const initialAgentData = new Float32Array(numAgents * this.agentInstanceSize / 4);  
+  setObstacleData(data : Float32Array, index : number, position : number[], rotation : number, scale : number[]) {
+    const offset = this.obstacleInstanceSize * index / 4;
 
-    for (let i = 0; i < numAgents/2; ++i) {
-      this.setAgentData(
-        initialAgentData, i,
-        [scatterWidth * (Math.random() - 0.5), scatterWidth * 0.25 + 2 * (Math.random() - 0.5)],
-        [1,0,0,1], [0,(0.1 + 0.5 * Math.random())*-1], [0, -scatterWidth]);
-    }
+    data[offset + 0] = position[0]; //100*(Math.random()-0.5);
+    data[offset + 1] = minY;
+    data[offset + 2] = position[1];
 
-    for (let i = numAgents/2; i < numAgents; ++i) {
-      this.setAgentData(
-        initialAgentData, i,
-        [-scatterWidth * (Math.random() - 0.5), -scatterWidth * 0.25 + 2 * (Math.random() - 0.5)],
-        [0,0,1,1], [0,(0.1 + 0.5 * Math.random())], [0, scatterWidth]);
-    }
+    data[offset + 3] = rotation; //rotation
 
-    return initialAgentData;
+    data[offset + 4] = scale[0];
+    data[offset + 5] = obstacleHeight;
+    data[offset + 6] = scale[1];
   }
 
   setAgentData(
@@ -243,20 +269,48 @@ export class ComputeBufferManager {
     agents[offset + 18] = goal[1];
   }
 
-  initAgentsProximity(numAgents : number) {
-    const initialAgentData = new Float32Array(numAgents * this.agentInstanceSize / 4);
-    for (let i = 0; i < numAgents/2; ++i) {
-      let x = i%100 - 50;
-      let z = Math.floor(i/100) + 5;
+  initProximal(agents : Float32Array, obstacles: Float32Array) {
+    for (let i = 0; i < agents.length/2; ++i) {
+      let x = i%10 - 5;
+      let z = Math.floor(i/10) + 10;
+      let v = 0.5;
+      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
+    }
+  }
+
+  initBottleneck(agents : Float32Array, obstacles: Float32Array) {
+    for (let i = 0; i < agents.length; ++i) {
+      let x = i%20 - 10;
+      let z = Math.floor(i/20) + 10;
       let v = 0.5;
       this.setAgentData(
-        initialAgentData, 2*i,
-        [1.25+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
-      this.setAgentData(
-        initialAgentData, 2*i + 1,
-        [-1.25+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
+        agents, 2*i,
+        [0.1+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
     }
-    return initialAgentData;
+
+    this.setObstacleData(obstacles, 0, [25,-25], 0, [20, 20]);
+    this.setObstacleData(obstacles, 1, [-25,-25], 0, [20, 20]);
+  }
+
+  initDense(agents : Float32Array, obstacles: Float32Array) {
+    for (let i = 0; i < agents.length/2; ++i) {
+      let x = i%100 - 50;
+      let z = Math.floor(i/100) + 10;
+      let v = 0.5;
+      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
+    }
+  }
+
+  initSparse(agents: Float32Array, obstacles: Float32Array) {
+    for (let i = 0; i < agents.length/2; ++i) {
+      let x = i%100 - 50;
+      let z = Math.floor(i/100) + 10;
+      let v = 0.5;
+      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], [0, scatterWidth]);
+    }
   }
 
 }

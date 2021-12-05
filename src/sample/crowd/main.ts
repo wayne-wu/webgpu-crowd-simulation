@@ -2,8 +2,8 @@ import { mat4, vec3 } from 'gl-matrix';
 import { makeSample, SampleInit } from '../../components/SampleLayout';
 import Camera from "./Camera";
 
-import { ComputeBufferManager } from './crowdUtils';
-import { renderBufferManager } from './renderUtils';
+import { TestScene, ComputeBufferManager } from './crowdUtils';
+import { RenderBufferManager } from './renderUtils';
 
 import renderWGSL from './shaders.wgsl';
 import crowdWGSL from './crowd.wgsl';
@@ -13,6 +13,7 @@ import findNeighborsWGSL from '../../shaders/findNeighbors.compute.wgsl';
 import contactSolveWGSL from '../../shaders/contactSolve.compute.wgsl';
 import constraintSolveWGSL from '../../shaders/constraintSolve.compute.wgsl';
 import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.compute.wgsl';
+import { render } from 'react-dom';
 
 
 let camera : Camera;
@@ -140,7 +141,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   };
 
   let prevGridWidth = guiParams.gridWidth;
-  resetSim = false;
+  resetSim = true;
 
   let gridFolder = gui.addFolder("Grid");
   gridFolder.add(guiParams, 'gridWidth', 1, 500, 1);
@@ -153,18 +154,27 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const simulationParams = {
     simulate: true,
     deltaTime: 0.02,
-    numAgents: 1024,
+    numAgents: 100,
+    numObstacles : 1,
     avoidance: false,
+    testScene: TestScene.PROXIMAL,
     resetSimulation: () => { resetSim = true; }
   };
 
   let prevNumAgents = simulationParams.numAgents;
+  let prevTestScene = simulationParams.testScene;
 
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
   simFolder.add(simulationParams, 'numAgents', 10, 100000, 10);
   simFolder.add(simulationParams, 'avoidance');
+  simFolder.add(simulationParams, 'testScene', {
+    'Proximal Behavior': TestScene.PROXIMAL, 
+    'Bottleneck': TestScene.BOTTLENECK,
+    'Dense Passing': TestScene.DENSE,
+    'Sparse Passing': TestScene.SPARSE,
+  });
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
@@ -195,17 +205,16 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   /////////////////////////////////////////////////////////////////////////
   //                     Compute Buffer Setup                            //
   /////////////////////////////////////////////////////////////////////////
-  var compBuffManager = new ComputeBufferManager(device, 
+  var compBuffManager = new ComputeBufferManager(device,
+                                                 simulationParams.testScene,
                                                  simulationParams.numAgents);
 
   //////////////////////////////////////////////////////////////////////////
   //                Render Buffer and Pipeline Setup                      //
   //////////////////////////////////////////////////////////////////////////
-  var renderBuffManager = new renderBufferManager(device, guiParams.gridWidth, 
+  var renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
                                                   presentationFormat, presentationSize,
-                                                  compBuffManager.agentInstanceSize,
-                                                  compBuffManager.agentPositionOffset, 
-                                                  compBuffManager.agentColorOffset);
+                                                  compBuffManager);
 
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
@@ -280,10 +289,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     return modelViewProjectionMatrix as Float32Array;
   }
 
-  function getCrowdTransform() {
+  function getViewProjection() {
     const modelViewProjectionMatrix = mat4.create();
     mat4.multiply(modelViewProjectionMatrix, camera.projectionMatrix, camera.viewMatrix);
-    return modelViewProjectionMatrix;
+    return modelViewProjectionMatrix as Float32Array;
   }
   
   function frame() {
@@ -309,9 +318,38 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         // and agents are redistributed
         resetSim = true;
       }
+
+      if (prevTestScene != simulationParams.testScene) {
+        prevTestScene = simulationParams.testScene;
+        switch(simulationParams.testScene) {
+          case TestScene.PROXIMAL:
+            simulationParams.numAgents = 1<<7;
+            simulationParams.numObstacles = 0;
+            break;
+          case TestScene.BOTTLENECK:
+            simulationParams.numAgents = 1<<10;
+            simulationParams.numObstacles = 2;
+            break;
+          case TestScene.DENSE:
+            simulationParams.numAgents = 1<<15;
+            simulationParams.numObstacles = 0;
+            break;
+          case TestScene.SPARSE:
+            simulationParams.numAgents = 1<<13;
+            simulationParams.numObstacles = 0;
+            break;
+        }
+        resetSim = true;
+      }
+
       // recompute agent buffer if resetSim button pressed
-      if (resetSim){
+      if (resetSim) {
+        compBuffManager.testScene = simulationParams.testScene;
         compBuffManager.numAgents = simulationParams.numAgents;
+
+        // NOTE: Can't have 0 binding size so we just set to 1 dummy if no obstacles
+        compBuffManager.numObstacles = Math.max(simulationParams.numObstacles, 1);
+
         // reinitilize buffers based on the new number of agents
         compBuffManager.initBuffers();
         computeBindGroup = compBuffManager.getBindGroup();
@@ -366,10 +404,18 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       // ----------------------- Draw ------------------------- //
       renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder);
-      renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder, guiParams.gridOn);
-      renderBuffManager.drawCrowd(device, getCrowdTransform(), passEncoder, compBuffManager.agentsBuffer, simulationParams.numAgents);
+      if (guiParams.gridOn)
+        renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder);
 
-    }      
+      const vp = getViewProjection();
+      renderBuffManager.drawCrowd(device, vp, passEncoder, compBuffManager.agentsBuffer, compBuffManager.numAgents);
+
+      if (simulationParams.numObstacles > 0)
+        renderBuffManager.drawObstacles(device, vp, passEncoder, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
+
+      passEncoder.endPass();
+    }
+
     device.queue.submit([commandEncoder.finish()]);
     requestAnimationFrame(frame);
     stats.end();

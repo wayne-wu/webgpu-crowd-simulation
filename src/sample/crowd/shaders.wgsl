@@ -45,5 +45,5 @@ fn fs_gridLines([[location(0)]] fragUV: vec2<f32>,
 [[stage(fragment)]]
 fn fs_platform([[location(0)]] fragUV: vec2<f32>,
         [[location(1)]] fragPosition: vec4<f32>) -> [[location(0)]] vec4<f32> {
-  return vec4<f32>(0.5, 0.5, 0.5, 1.0);
+  return vec4<f32>(0.8, 0.8, 0.8, 1.0);
 }
