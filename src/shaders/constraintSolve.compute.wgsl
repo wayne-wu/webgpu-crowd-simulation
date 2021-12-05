@@ -4,9 +4,9 @@
 
 let maxIterations : i32 = 6;     // paper = 6
 let t0 : f32 = 20.0;             // paper = 20
-let tObstacle : f32 = 5.0;
+let tObstacle : f32 = 10.0;
 let kUser : f32 = 0.15;          // paper = 0.24 [0-1]
-let kObstacle : f32 = 0.05;
+let kObstacle : f32 = 0.5;
 let avgCoefficient : f32 = 1.2;  // paper = 1.2  [1-2]
 
 [[block]] struct SimulationParams {
@@ -148,22 +148,24 @@ fn obstacle_constraint(agent: Agent, obstacle: Obstacle, itr: i32, count: ptr<fu
   // Create Model Matrix
   let c = cos(obstacle.rot);
   let s = sin(obstacle.rot);
-  var model = mat4x4<f32>();
-  model[0] = vec4<f32>(obstacle.scale.x*c, 0.0, -s, 0.0);
-  model[1] = vec4<f32>(0.0, obstacle.scale.y, 0.0, 0.0);
-  model[2] = vec4<f32>(s, 0.0, obstacle.scale.z*c, 0.0);
-  model[3] = vec4<f32>(obstacle.pos, 1.0);
+  var m = mat4x4<f32>();
+  m[0] = vec4<f32>(obstacle.scale.x*c, 0.0, -s, 0.0);
+  m[1] = vec4<f32>(0.0, obstacle.scale.y, 0.0, 0.0);
+  m[2] = vec4<f32>(s, 0.0, obstacle.scale.z*c, 0.0);
+  m[3] = vec4<f32>(obstacle.pos, 1.0);
 
   // Get Corner Points in World Position (Cube)
-  var p1 = (model * vec4<f32>(1.0,0.0,1.0,1.0)).xz;
-  var p2 = (model * vec4<f32>(1.0,0.0,-1.0,1.0)).xz;
-  var p3 = (model * vec4<f32>(-1.0,0.0,-1.0,1.0)).xz;
-  var p4 = (model * vec4<f32>(-1.0,0.0,1.0,1.0)).xz;
+  let l = 1.1;
+  var p1 = (m * vec4<f32>(l,0.0,l,1.0)).xz;
+  var p2 = (m * vec4<f32>(l,0.0,-l,1.0)).xz;
+  var p3 = (m * vec4<f32>(-l,0.0,-l,1.0)).xz;
+  var p4 = (m * vec4<f32>(-l,0.0,l,1.0)).xz;
 
   var v = (agent.xp - agent.x)/sim_params.deltaTime;
   var a0 = agent.xp.xz;
   var a1 = (agent.xp + tObstacle * v).xz;  // max look-ahead
   
+  // Intersection test with the four edges
   var n_tmp : vec2<f32>;
   var n_min : vec2<f32>;
   var t_tmp : f32;
@@ -180,8 +182,11 @@ fn obstacle_constraint(agent: Agent, obstacle: Obstacle, itr: i32, count: ptr<fu
   if (t_min < 1.0) { 
     t_min = t_min * tObstacle;  // remap t_min to 0 to tObstacle
     
-    if(dot(v.xz, n_min) > 0.0) { n_min = -n_min; }  // flip the normal direction
-    var n = vec3<f32>(n_min.x, 0.0, n_min.y);  // contact normal
+    //if(dot(v.xz, n_min) > 0.0) { n_min = -n_min; }  // flip the normal direction
+    //var n = vec3<f32>(n_min.x, 0.0, n_min.y);  // contact normal
+
+    // Use the radial normal as the contact normal so that there's some tangential velocity
+    var n = normalize((agent.xp + t_min * v) - obstacle.pos);
 
     var k = kObstacle * exp(-t_min*t_min/tObstacle);
     k = 1.0 - pow(1.0 - k, 1.0/(f32(itr + 1)));

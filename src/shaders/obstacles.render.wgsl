@@ -36,7 +36,7 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 
   var out : VertexOutput;  
   out.position = render_params.modelViewProjectionMatrix * model * in.mesh_pos;
-  out.color = vec4<f32>(0.0);
+  out.color = vec4<f32>(0.1);
   return out;
 }
 
