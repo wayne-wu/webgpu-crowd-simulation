@@ -119,8 +119,8 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     agentData.agents[idx] = agent;
 
     // Sync Threads
-    storageBarrier();
-    workgroupBarrier();
+    //storageBarrier();
+   // workgroupBarrier();
 
     itr = itr + 1;
   }
