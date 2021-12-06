@@ -23,8 +23,8 @@ import {
   cubeVertexCount,
 } from '../../meshes/cube';
 
-import renderWGSL from './shaders.wgsl';
-import crowdWGSL from './crowd.wgsl';
+import renderWGSL from '../../shaders/background.render.wgsl';
+import crowdWGSL from '../../shaders/crowd.render.wgsl';
 import obstaclesWGSL from '../../shaders/obstacles.render.wgsl'
 import { mat4 } from 'gl-matrix';
 import { ComputeBufferManager } from './crowdUtils';

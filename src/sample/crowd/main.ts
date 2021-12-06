@@ -5,8 +5,8 @@ import Camera from "./Camera";
 import { TestScene, ComputeBufferManager } from './crowdUtils';
 import { RenderBufferManager } from './renderUtils';
 
-import renderWGSL from './shaders.wgsl';
-import crowdWGSL from './crowd.wgsl';
+import renderWGSL from '../../shaders/background.render.wgsl';
+import crowdWGSL from '../../shaders/crowd.render.wgsl';
 import explicitIntegrationWGSL from '../../shaders/explicitIntegration.compute.wgsl';
 import assignCellsWGSL from '../../shaders/assignCells.compute.wgsl';
 import buildHashGrid from '../../shaders/buildHashGrid.compute.wgsl';
@@ -470,12 +470,12 @@ const Crowd: () => JSX.Element = () =>
         contents: __SOURCE__,
       },
       {
-        name: './shaders.wgsl',
+        name: '../../shaders/background.render.wgsl',
         contents: renderWGSL,
         editable: true,
       },
       {
-        name: './crowd.wgsl',
+        name: '../../shaders/crowd.render.wgsl',
         contents: crowdWGSL,
         editable: true,
       },

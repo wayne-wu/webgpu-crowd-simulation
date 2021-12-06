@@ -83,5 +83,5 @@ fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
   var cameraDir = in.position.xyz - render_params.cameraPos;
   var lightDir = vec4<f32>(1.0, 1.0, 1.0, 0.0);
   var lambertTerm = dot(normalize(lightDir), normalize(in.mesh_nor));
-  return in.color + lambertTerm * vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  return in.color + 0.5 * lambertTerm * vec4<f32>(1.0, 1.0, 1.0, 1.0);
 }
