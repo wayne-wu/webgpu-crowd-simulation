@@ -24,6 +24,7 @@ struct Agent {
   v  : vec3<f32>;  // velocity + inverse mass
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
+  speed : f32;
   goal : vec3<f32>;
   cell : i32;
 };
@@ -110,7 +111,8 @@ fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<func
     
     var k = kUser * exp(-t_nocollision*t_nocollision/t0);
     k = 1.0 - pow(1.0 - k, 1.0/(f32(itr + 1)));
-    var dx = -agent.w * f * n / (agent.w + agent_j.w);
+    let w = agent.w / (agent.w + agent_j.w);
+    var dx = -w * f * n;
 
     // 4.5 Avoidance Model
     if (sim_params.avoidance == 1.0f) {
@@ -123,7 +125,7 @@ fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<func
 
       // tangential relative displacement
       let d_tangent = d_vec - dot(d_vec, n)*n;
-      dx = d_tangent;
+      dx = w * d_tangent;
     }
 
     *totalDx = *totalDx + k * dx;
