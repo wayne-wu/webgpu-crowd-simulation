@@ -22,8 +22,8 @@ let aspect : number;
 let resetSim : boolean;
 
 // Reset camera to original settings (gui function)
-function resetCameraFunc() {
-  camera = new Camera(vec3.fromValues(50, 50, 50), vec3.fromValues(0, 0, 0));
+function resetCameraFunc(x: number = 50, y: number = 50, z: number = 50) {
+  camera = new Camera(vec3.fromValues(x, y, z), vec3.fromValues(0, 0, 0));
   camera.setAspectRatio(aspect);
   camera.updateProjectionMatrix();
 }
@@ -156,7 +156,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   };
 
   let prevNumAgents = simulationParams.numAgents;
-  let prevTestScene = simulationParams.testScene;
+  let prevTestScene = TestScene.DENSE;
 
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
@@ -168,6 +168,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     'Bottleneck': TestScene.BOTTLENECK,
     'Dense Passing': TestScene.DENSE,
     'Sparse Passing': TestScene.SPARSE,
+    'Obstacles': TestScene.OBSTACLES,
   });
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
@@ -352,20 +353,29 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         prevTestScene = simulationParams.testScene;
         switch(simulationParams.testScene) {
           case TestScene.PROXIMAL:
-            compBuffManager.numValidAgents = 1<<7;
+            resetCameraFunc(10,10,10);
+            compBuffManager.numValidAgents = 1<<6;
             simulationParams.numObstacles = 0;
             break;
           case TestScene.BOTTLENECK:
+            resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 2;
             break;
           case TestScene.DENSE:
+            resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<15;
             simulationParams.numObstacles = 0;
             break;
           case TestScene.SPARSE:
+            resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<12;
             simulationParams.numObstacles = 0;
+            break;
+          case TestScene.OBSTACLES:
+            resetCameraFunc(50,50,50);
+            compBuffManager.numValidAgents = 1<<10;
+            simulationParams.numObstacles = 5;
             break;
         }
         resetSim = true;

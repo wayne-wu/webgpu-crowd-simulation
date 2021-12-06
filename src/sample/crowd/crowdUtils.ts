@@ -13,6 +13,7 @@ export enum TestScene {
   BOTTLENECK = "bottleneck",
   DENSE = "dense",
   SPARSE = "sparse",
+  OBSTACLES = "obstacles",
 }
 
 
@@ -125,6 +126,9 @@ export class ComputeBufferManager {
         break;
       case TestScene.SPARSE:
         this.initSparse(agentData, obstacleData);
+        break;
+      case TestScene.OBSTACLES:
+        this.initObstacles(agentData,obstacleData);
         break;
     }
 
@@ -293,8 +297,8 @@ export class ComputeBufferManager {
 
   initProximal(agents : Float32Array, obstacles: Float32Array) {
     for (let i = 0; i < agents.length/2; ++i) {
-      let x = i%50 - 25;
-      let z = Math.floor(i/50) + 5;
+      let x = Math.floor(i/10);
+      let z = i%10 + 5;
       let v = 0.5;
       this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
       this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth]);
@@ -333,6 +337,24 @@ export class ComputeBufferManager {
       let s = (Math.random() - 0.5) + preferredVelocity;
       this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], s, [0, -scatterWidth]);
       this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], s, [0, scatterWidth]);
+    }
+  }
+
+  initObstacles(agents: Float32Array, obstacles: Float32Array) {
+    for (let i = 0; i < agents.length/2; ++i) {
+      let x = i%100 - 50;
+      let z = Math.floor(i/100) + 10;
+      let v = 0.5;
+      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth]);
+    }
+
+    for (let i = 0; i < obstacles.length; i++)
+    {
+      
+      let scale = Math.random() * 3 + 1;
+      let rot = Math.random() * Math.PI;
+      this.setObstacleData(obstacles, i, [(Math.random()-0.5)*scatterWidth,0], rot, [scale, scale]);
     }
   }
 
