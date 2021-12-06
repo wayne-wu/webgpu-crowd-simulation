@@ -4,7 +4,6 @@
 
 let xsph_c : f32 = 7.0;    // paper = 7.0
 let xsph_h : f32 = 217.0;  // paper = 217.0 // the smoothing distance specified in the paper (assumes particles with radius 1)
-let maxSpeed : f32 = 1.4;  // paper = 1.4
 let nearRadius : f32 = 2.0;
 
 [[block]] struct SimulationParams {
@@ -21,6 +20,7 @@ struct Agent {
   v  : vec3<f32>;  // velocity + inverse mass
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
+  speed : f32;
   goal : vec3<f32>;
   cell : i32;
 };
@@ -108,6 +108,8 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   agent.v = agent.v + xsph_c * velAvg;
 
   // 4.6 Maximum Speed and Acceleration Limiting
+
+  let maxSpeed : f32 = agent.speed;
   if(length(agent.v) > maxSpeed){
     agent.v = maxSpeed * normalize(agent.v);
   }

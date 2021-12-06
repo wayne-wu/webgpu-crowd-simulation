@@ -40,8 +40,9 @@ function getSortStepWGSL(numAgents : number, k : number, j : number, ){
     v  : vec3<f32>;  // velocity + inverse mass
     w  : f32;
     xp : vec3<f32>;  // planned/predicted position
-    goal: vec3<f32>;
-    cell : i32;      // grid cell (linear form)
+    speed : f32;
+    goal : vec3<f32>;
+    cell : i32;
   };
 
   [[block]] struct Agents {
@@ -363,7 +364,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             simulationParams.numObstacles = 0;
             break;
           case TestScene.SPARSE:
-            compBuffManager.numValidAgents = 1<<13;
+            compBuffManager.numValidAgents = 1<<12;
             simulationParams.numObstacles = 0;
             break;
         }

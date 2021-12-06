@@ -23,6 +23,7 @@ struct Agent {
   v  : vec3<f32>;  // velocity + inverse mass
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
+  speed : f32;
   goal : vec3<f32>;
   cell : i32;
 };

@@ -9,12 +9,13 @@
 };
 
 struct Agent {
-  x    : vec3<f32>;  // position 
-  r    : f32;        // radius
-  c    : vec4<f32>;  // color
-  v    : vec3<f32>;  // velocity 
-  w    : f32;        // inverse mass
-  xp   : vec3<f32>;  // planned/predicted position
+  x  : vec3<f32>;  // position + radius
+  r  : f32;
+  c  : vec4<f32>;  // color
+  v  : vec3<f32>;  // velocity + inverse mass
+  w  : f32;
+  xp : vec3<f32>;  // planned/predicted position
+  speed : f32;
   goal : vec3<f32>;
   cell : i32;
 };

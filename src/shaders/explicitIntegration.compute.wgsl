@@ -21,6 +21,7 @@ struct Agent {
   v  : vec3<f32>;  // velocity + inverse mass
   w  : f32;
   xp : vec3<f32>;  // planned/predicted position
+  speed : f32;
   goal : vec3<f32>;
   cell : i32;
 };
@@ -34,7 +35,7 @@ struct Agent {
 
 fn getVelocityFromPlanner(agent : Agent) -> vec3<f32> {
   // TODO: Implement a more complex planner
-  return normalize(agent.goal - agent.x) * preferredVelocity;
+  return normalize(agent.goal - agent.x) * agent.speed;
 }
 
 [[stage(compute), workgroup_size(64)]]
