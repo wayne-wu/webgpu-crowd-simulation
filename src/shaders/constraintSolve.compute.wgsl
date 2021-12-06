@@ -6,7 +6,7 @@ let maxIterations : i32 = 6;     // paper = 6
 let t0 : f32 = 20.0;             // paper = 20
 let tObstacle : f32 = 10.0;
 let kUser : f32 = 0.15;          // paper = 0.24 [0-1]
-let kObstacle : f32 = 0.5;
+let kObstacle : f32 = 1.0;
 let avgCoefficient : f32 = 1.2;  // paper = 1.2  [1-2]
 let farRadius : f32 = 5.0;
 
@@ -53,7 +53,7 @@ struct Obstacle {
 
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
-[[binding(2), group(0)]] var<storage, read_write> grid : Grid;
+[[binding(2), group(0)]] var<storage, read> grid : Grid;
 [[binding(3), group(0)]] var<storage, read> obstacleData : Obstacles;
 
 fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<function, i32>, totalDx: ptr<function, vec3<f32>>)
@@ -126,7 +126,6 @@ fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<func
       dx = d_tangent;
     }
 
-    // TODO: 4.2 Friction Model (See 6.1 of https://mmacklin.com/uppfrta_preprint.pdf)
     *totalDx = *totalDx + k * dx;
     *count = *count + 1;
   }
@@ -284,8 +283,8 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     agentData.agents[idx] = agent;
 
     // Sync Threads
-   //storageBarrier();
-   // workgroupBarrier();
+    // storageBarrier();
+    // workgroupBarrier();
 
     itr = itr + 1;
   }

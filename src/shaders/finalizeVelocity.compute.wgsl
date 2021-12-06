@@ -40,7 +40,7 @@ struct CellIndices {
 
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
-[[binding(2), group(0)]] var<storage, read_write> grid : Grid;
+[[binding(2), group(0)]] var<storage, read> grid : Grid;
 
 fn getW(d : f32) -> f32 {
     var w = 0.0; // poly6 smoothing kernel
@@ -113,7 +113,8 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   }
 
   // Set new position to be the corrected position
-  agent.x = agent.xp;
+  // Reintegrate here so that the position doesn't jump between frames
+  agent.x = agent.x + agent.v * sim_params.deltaTime;
   
   // Store the new agent value
   agentData.agents[idx] = agent;

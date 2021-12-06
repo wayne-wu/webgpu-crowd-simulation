@@ -11,6 +11,7 @@ let maxNeighbors : u32 = 20u;
   deltaTime : f32;
   avoidance : f32;
   numAgents : f32;
+  gridWidth : f32;
 };
 
 struct Agent {
