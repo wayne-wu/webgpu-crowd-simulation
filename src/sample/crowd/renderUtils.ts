@@ -28,6 +28,9 @@ import crowdWGSL from './crowd.wgsl';
 import obstaclesWGSL from '../../shaders/obstacles.render.wgsl'
 import { mat4 } from 'gl-matrix';
 import { ComputeBufferManager } from './crowdUtils';
+import { Mesh } from '../../meshes/mesh';
+
+import { vec3 } from 'gl-matrix';
 
 export class RenderBufferManager {
 
@@ -37,6 +40,7 @@ export class RenderBufferManager {
   gridLinesVertexBuffer   : GPUBuffer;
   prototypeVertexBuffer   : GPUBuffer;
   obstacleVertexBuffer    : GPUBuffer;
+  meshVertexBuffer        : GPUBuffer;
 
   platformPipeline        : GPURenderPipeline;
   gridLinesPipeline       : GPURenderPipeline;
@@ -56,9 +60,12 @@ export class RenderBufferManager {
 
   renderPassDescriptor    : GPURenderPassDescriptor;
 
-  constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager) 
+  mesh                    : Mesh;
+
+  constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, mesh : Mesh) 
   {
     this.device = device;
+    this.mesh = mesh;
     this.initBuffers(gridWidth);
     this.buildPipelines(presentationFormat, cbm);
     this.setBindGroups();
@@ -75,6 +82,8 @@ export class RenderBufferManager {
 
     this.prototypeVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
     this.obstacleVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
+
+    this.meshVertexBuffer = getVerticesBuffer(this.device, this.mesh.vertexArray);
   }
 
   buildPipelines(presentationFormat, cbm: ComputeBufferManager) {
@@ -91,8 +100,8 @@ export class RenderBufferManager {
 
     this.crowdPipeline = getCrowdRenderPipeline(
       this.device, crowdWGSL, cbm.agentInstanceSize, cbm.agentPositionOffset, 
-      cbm.agentColorOffset, cubeVertexSize, cubePositionOffset, cubeUVOffset, presentationFormat
-    );
+      cbm.agentColorOffset, cbm.agentVelocityOffset, this.mesh.normalOffset, this.mesh.itemSize, this.mesh.posOffset, 
+      this.mesh.uvOffset, presentationFormat);
 
     this.obstaclesPipeline = getObstaclesRenderPipeline(
       this.device, obstaclesWGSL, cbm.obstacleInstanceSize, 0, 
@@ -105,7 +114,7 @@ export class RenderBufferManager {
     let mvpSize = 4 * 16;  // mat4
     this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize);
     this.gridLinesUniformBuffer = getUniformBuffer(this.device, mvpSize);
-    this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize);
+    this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize + 3*4 + 1*4);
     this.obstaclesUniformBuffer = getUniformBuffer(this.device, mvpSize);
 
     this.platformBindGroup = getUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer);
@@ -172,7 +181,7 @@ export class RenderBufferManager {
     passEncoder.draw(gridLinesVertexCount, 1, 0, 0);
   }
 
-  drawCrowd(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, agentsBuffer: GPUBuffer, numAgents: number) {
+  drawCrowd(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, agentsBuffer: GPUBuffer, numAgents: number, cameraPos: vec3) {
     device.queue.writeBuffer(
       this.crowdUniformBuffer,
       0,
@@ -180,11 +189,25 @@ export class RenderBufferManager {
       mvp.byteOffset,
       mvp.byteLength
     );
+    var cam = cameraPos as Float32Array;
+    device.queue.writeBuffer(
+      this.crowdUniformBuffer,
+      mvp.byteLength,
+      cam
+    );
+    device.queue.writeBuffer(
+      this.crowdUniformBuffer,
+      mvp.byteLength + cam.byteLength,
+      new Float32Array([
+        // agent scale
+        this.mesh.scale
+      ])
+    );
     passEncoder.setPipeline(this.crowdPipeline);
     passEncoder.setBindGroup(0, this.crowdBindGroup);
     passEncoder.setVertexBuffer(0, agentsBuffer);
-    passEncoder.setVertexBuffer(1, this.prototypeVertexBuffer);
-    passEncoder.draw(cubeVertexCount, numAgents, 0, 0);
+    passEncoder.setVertexBuffer(1, this.meshVertexBuffer);
+    passEncoder.draw(this.mesh.vertexCount, numAgents, 0, 0);
   }
   
   drawObstacles(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, obstaclesBuffer: GPUBuffer, numObstacles: number) {
@@ -281,9 +304,8 @@ const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryP
   return pipeline;
 }
 
-const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, 
-                                vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
-
+const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, velOffset: number, vertNorOffset: number,
+                                       vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
   let buffers = [
     {
       // instanced agents buffer
@@ -302,6 +324,12 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
           offset: colOffset,
           format: 'float32x4',
         },
+        {
+          // velocity
+          shaderLocation: 2,
+          offset: velOffset,
+          format: 'float32x3'
+        },
       ],
     },
     {
@@ -309,24 +337,31 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
       attributes: [
         {
           // position
-          shaderLocation: 2,
+          shaderLocation: 3,
           offset: vertPosOffset,
           format: 'float32x4',
         },
         {
           // uv
-          shaderLocation: 3,
+          shaderLocation: 4,
           offset: vertUVOffset,
           format: 'float32x2',
         },
-      ],
-    },
-  ]
+        {
+          // normal
+          shaderLocation: 5,
+          offset: vertNorOffset,
+          format: 'float32x4'
+        },
+        ],
+    },   
+  ];
 
-  const renderPipelineCrowd = device.createRenderPipeline(
-    getPipelineDescriptor(device, code, "vs_main", "fs_main", buffers, presentationFormat, "triangle-list", "back"));
+  var desc = getPipelineDescriptor(device, code, 'vs_main', 'fs_main', buffers, presentationFormat, 'triangle-list', 'back');
+  desc.primitive.frontFace = 'cw';
 
-  return renderPipelineCrowd;
+  const pipeline = device.createRenderPipeline(desc);
+  return pipeline;
 };
 
 const getObstaclesRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, 

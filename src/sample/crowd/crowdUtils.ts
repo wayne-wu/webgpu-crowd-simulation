@@ -29,6 +29,7 @@ export class ComputeBufferManager {
   agentInstanceSize : number;
   agentPositionOffset : number;
   agentColorOffset : number;
+  agentVelocityOffset: number;
   cellInstanceSize : number;
 
   obstacleInstanceSize : number;
@@ -57,6 +58,7 @@ export class ComputeBufferManager {
 
     this.agentPositionOffset = 0;
     this.agentColorOffset = 4 * 4;
+    this.agentVelocityOffset = 8 * 4;
 
     this.numAgents = Math.pow(2, Math.ceil(Math.log2(numAgents)));
     this.numValidAgents = numAgents;

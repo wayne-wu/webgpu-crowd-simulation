@@ -2,7 +2,7 @@
 // Explicit Integration for Advecting the Agents
 ////////////////////////////////////////////////////////////////////////////////
 
-let ksi : f32 = 0.05;  // paper = 0.0385
+let ksi : f32 = 0.0385;  // paper = 0.0385
 let preferredVelocity : f32 = 1.4; // paper = 1.4
 
 let maxNeighbors : u32 = 20u;

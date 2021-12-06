@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 import { makeSample, SampleInit } from '../../components/SampleLayout';
 import Camera from "./Camera";
 
@@ -13,7 +13,9 @@ import buildHashGrid from '../../shaders/buildHashGrid.compute.wgsl';
 import contactSolveWGSL from '../../shaders/contactSolve.compute.wgsl';
 import constraintSolveWGSL from '../../shaders/constraintSolve.compute.wgsl';
 import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.compute.wgsl';
-import { render } from 'react-dom';
+
+import {loadModel, Mesh} from "../../meshes/mesh";
+import { meshDictionary } from './meshDictionary';
 
 let camera : Camera;
 let aspect : number;
@@ -169,6 +171,12 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
+  const modelParams = {
+    model: 'Duck'
+  }
+  let prevModel = 'Duck';
+  gui.add(modelParams, 'model', ['Archer', 'Duck', 'Cesium Man']);
+
 
   /////////////////////////////////////////////////////////////////////////
   //                     Initial Context Setup                           //
@@ -204,9 +212,18 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //////////////////////////////////////////////////////////////////////////
   //                Render Buffer and Pipeline Setup                      //
   //////////////////////////////////////////////////////////////////////////
-  var renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
-                                                  presentationFormat, presentationSize,
-                                                  compBuffManager);
+  var renderBuffManager : RenderBufferManager;
+
+  var bufManagerExists = false;
+  var modelData = meshDictionary[modelParams.model];
+  loadModel(modelData.filename).then((mesh : Mesh) => {
+    mesh.scale = modelData.scale;
+    renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
+      presentationFormat, presentationSize,
+      compBuffManager, mesh);
+    
+    bufManagerExists = true;
+  });
 
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
@@ -283,6 +300,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   function getViewProjection() {
     const modelViewProjectionMatrix = mat4.create();
+
     mat4.multiply(modelViewProjectionMatrix, camera.projectionMatrix, camera.viewMatrix);
     return modelViewProjectionMatrix as Float32Array;
   }
@@ -298,6 +316,20 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       resetSim = true;
       simulationParams.gridWidth = guiParams.gridWidth;
       prevGridWidth = guiParams.gridWidth;
+    }
+
+    if (prevModel != modelParams.model) {
+      bufManagerExists = false;
+      prevModel = modelParams.model;
+      var modelData = meshDictionary[modelParams.model];
+      loadModel(modelData.filename).then((mesh : Mesh) => {
+        mesh.scale = modelData.scale;
+        renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
+          presentationFormat, presentationSize,
+          compBuffManager, mesh);
+    
+        bufManagerExists = true;
+      });
     }
 
     camera.update();
@@ -393,7 +425,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     }
 
     // ------------------ Render Calls ------------------------- //
-    {
+    if (bufManagerExists) {
       const transformationMatrix = getTransformationMatrix();
 
       renderBuffManager.renderPassDescriptor.colorAttachments[0].view = context
@@ -408,7 +440,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder);
 
       const vp = getViewProjection();
-      renderBuffManager.drawCrowd(device, vp, passEncoder, compBuffManager.agentsBuffer, compBuffManager.numAgents);
+      const camPos = vec3.fromValues(camera.controls.eye[0], camera.controls.eye[1], camera.controls.eye[2]) ;
+      renderBuffManager.drawCrowd(device, vp, passEncoder, compBuffManager.agentsBuffer, compBuffManager.numAgents, camPos);
 
       if (simulationParams.numObstacles > 0)
         renderBuffManager.drawObstacles(device, vp, passEncoder, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
@@ -460,6 +493,11 @@ const Crowd: () => JSX.Element = () =>
         name: '../../meshes/cube.ts',
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         contents: require('!!raw-loader!../../meshes/cube.ts').default,
+      },
+      {
+        name: '../../meshes/mesh.ts',
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        contents: require('!!raw-loader!../../meshes/mesh.ts').default,
       },
     ],
     filename: __filename,
