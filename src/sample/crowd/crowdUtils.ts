@@ -136,7 +136,7 @@ export class ComputeBufferManager {
     // agent buffer
     this.agentsBuffer = this.device.createBuffer({
       size: this.numAgents * this.agentInstanceSize,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
       mappedAtCreation: true
     });
     new Float32Array(this.agentsBuffer.getMappedRange()).set(agentData);
@@ -145,7 +145,7 @@ export class ComputeBufferManager {
     // cells buffer
     this.cellsBuffer = this.device.createBuffer({
       size: this.gridWidth * this.gridWidth * this.cellInstanceSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+      usage: GPUBufferUsage.STORAGE,
       mappedAtCreation: false
     });
 
@@ -304,7 +304,7 @@ export class ComputeBufferManager {
       let z = Math.floor(i/20) + 10;
       let v = 0.5;
       this.setAgentData(
-        agents, 2*i,
+        agents, i,
         [0.1+x, z], [1,0,0,1], [0,-v], [0, -scatterWidth]);
     }
 

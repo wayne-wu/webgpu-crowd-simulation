@@ -40,7 +40,7 @@ struct CellIndices {
 
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
-[[binding(2), group(0)]] var<storage, read_write> grid : Grid;
+[[binding(2), group(0)]] var<storage, read> grid : Grid;
 
 fn getW(d : f32) -> f32 {
     var w = 0.0; // poly6 smoothing kernel
