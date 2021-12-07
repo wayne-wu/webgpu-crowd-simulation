@@ -2,12 +2,34 @@
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Final Project**
 
-by [Ashley Alexander-Lee](), [Matt Elser](), and [Wayne Wu](www.wuwayne.com).
+by [Ashley Alexander-Lee](), [Matt Elser](), and [Wayne Wu](https://www.wuwayne.com/).
 
 ## Overview
 Based on: [Position-Based Real-Time Simulation of Large Crowds](https://tomerwei.github.io/pdfs/mig2017.pdf).
 
 ![Real-Time Crowd Simulation GIF](img/milestone1_progress.gif)
+
+## Neighbor Searching
+
+## Position-Based Dynamics
+
+### Short Range Collision
+
+### Long Range Collision
+
+### Long Range Collision w/ Avoidance Model
+
+### Frictional Contact
+
+### Cohesion
+
+### Obstacles Avoidance
+
+### Parameters Tuning
+
+## Rendering
+
+## Test Scenes
 
 Installation
 ============
@@ -15,7 +37,7 @@ Installation
 2. Run `npm i`
 3. Build with `npm run-script build`
 4. Start with `npm start`
-5. Must view using Google Chrome Canary
+5. Must view using Google Chrome Canary or Chrome Developer
 6. Be sure to `--enable-unsafe-webgpu` in the Chrome Settings
 
 References
