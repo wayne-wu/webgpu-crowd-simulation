@@ -16,11 +16,13 @@ struct VertexInput {
   [[location(2)]] scale    : vec3<f32>;
   [[location(3)]] mesh_pos : vec4<f32>;  // mesh vertex position (model space)
   [[location(4)]] mesh_uv  : vec2<f32>;  // mesh vertex uv
+  [[location(5)]] mesh_nor : vec4<f32>;
 };
 
 struct VertexOutput {
   [[builtin(position)]] position : vec4<f32>;
   [[location(0)]]       color    : vec4<f32>;
+  [[location(1)]]       normal   : vec4<f32>;
 };
 
 [[stage(vertex)]]
@@ -34,9 +36,16 @@ fn vs_main(in : VertexInput) -> VertexOutput {
   model[2] = vec4<f32>(s, 0.0, in.scale.z*c, 0.0);
   model[3] = vec4<f32>(in.position, 1.0);
 
+  var rot = mat4x4<f32>();
+  rot[0] = vec4<f32>(c, 0.0, s, 0.0);
+  rot[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
+  rot[2] = vec4<f32>(-s, 0.0, c, 0.0);
+  rot[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+
   var out : VertexOutput;  
   out.position = render_params.modelViewProjectionMatrix * model * in.mesh_pos;
   out.color = vec4<f32>(0.1);
+  out.normal = normalize(rot * in.mesh_nor);
   return out;
 }
 
@@ -45,5 +54,8 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 ////////////////////////////////////////////////////////////////////////////////
 [[stage(fragment)]]
 fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
-  return in.color;
+  var lightDir = vec4<f32>(-1.0, 0.5, -1.0, 0.0);
+  var lambertTerm = dot(normalize(lightDir), normalize(in.normal));
+  var lightColor = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  return vec4<f32>(0.8, 0.8, 0.8, 1.0) + lightColor * lambertTerm * 0.2;
 }

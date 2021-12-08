@@ -462,8 +462,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       // ----------------------- Draw ------------------------- //
       renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder);
-      if (guiParams.gridOn)
-        renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder);
+      //if (guiParams.gridOn)
+      //  renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder);
 
       const vp = getViewProjection();
       const camPos = vec3.fromValues(camera.controls.eye[0], camera.controls.eye[1], camera.controls.eye[2]) ;
