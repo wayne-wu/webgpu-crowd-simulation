@@ -4,18 +4,32 @@
 
 by [Ashley Alexander-Lee](), [Matt Elser](), and [Wayne Wu](https://www.wuwayne.com/).
 
+![Teaser Image](img/duck_crowd_sim.png)
+
 ## Overview
-Based on: [Position-Based Real-Time Simulation of Large Crowds](https://tomerwei.github.io/pdfs/mig2017.pdf).
+This project attempts to implement a real-time crowd simulation based on the paper: [Position-Based Real-Time Simulation of Large Crowds](https://tomerwei.github.io/pdfs/mig2017.pdf). 
+Unlike the paper which uses CUDA and Unreal Engine for simulation and rendering,
+this project uses WebGPU for both.
 
 ![Real-Time Crowd Simulation GIF](img/milestone1_progress.gif)
 
 ## Neighbor Searching
 
 ## Position-Based Dynamics
+The main solver used in the paper is Position-based Dynamics with Jacobi Solver, which can be parallelized very easily.
 
 ### Short Range Collision
+The first constraint applied is a simple collision constraint model for short range collision.
+This resolves the immediate collisions between neighboring agents to prevent penetration.
+
+![Short Range](img/shortrange.gif)
 
 ### Long Range Collision
+Long range collision constraint is used to enable agents to look ahead in the future for possible collisions.
+The constraint will predict the position of neighboring agents at a specified future time and resolve any collision at the future position.
+As shown in the image below, the agents start reacting before they are even close to colliding.
+
+![Long Range](img/longrange.gif)
 
 ### Long Range Collision w/ Avoidance Model
 
