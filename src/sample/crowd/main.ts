@@ -142,19 +142,13 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   let prevNumAgents = simulationParams.numAgents;
   let prevTestScene = TestScene.DENSE;
-
+  
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
   simFolder.add(simulationParams, 'numAgents', 10, 100000, 2);
   simFolder.add(simulationParams, 'avoidance');
-  simFolder.add(simulationParams, 'testScene', {
-    'Proximal Behavior': TestScene.PROXIMAL, 
-    'Bottleneck': TestScene.BOTTLENECK,
-    'Dense Passing': TestScene.DENSE,
-    'Sparse Passing': TestScene.SPARSE,
-    'Obstacles': TestScene.OBSTACLES,
-  });
+  simFolder.add(simulationParams, 'testScene', Object.values(TestScene));
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
@@ -359,6 +353,11 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 5;
+            break;
+          case TestScene.CIRCLE:
+            resetCameraFunc(5,20,5);
+            compBuffManager.numValidAgents = 1<<6;
+            simulationParams.numObstacles = 0;
             break;
         }
         resetSim = true;

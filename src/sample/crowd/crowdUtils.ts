@@ -14,6 +14,7 @@ export enum TestScene {
   DENSE = "dense",
   SPARSE = "sparse",
   OBSTACLES = "obstacles",
+  CIRCLE = "circle",
 }
 
 
@@ -131,6 +132,9 @@ export class ComputeBufferManager {
         break;
       case TestScene.OBSTACLES:
         this.initObstacles(agentData,obstacleData);
+        break;
+      case TestScene.CIRCLE:
+        this.initCircle(agentData, obstacleData);
         break;
     }
 
@@ -367,6 +371,20 @@ export class ComputeBufferManager {
       let scale = Math.random() * 3 + 1;
       let rot = Math.random() * Math.PI;
       this.setObstacleData(obstacles, i, [(Math.random()-0.5)*scatterWidth,0], rot, [scale, scale]);
+    }
+  }
+
+  initCircle(agents: Float32Array, obstacles: Float32Array) {
+    
+    let radius = this.numAgents * diskRadius / Math.PI;
+    
+    for(let i = 0; i < this.numAgents; i++) {
+      let t = (i/this.numAgents) * 2.0 * Math.PI;
+      let x = radius * Math.cos(t);
+      let z = radius * Math.sin(t);
+      let c = [Math.random(), Math.random(), Math.random(), 1];
+      let s = (Math.random() - 0.5) + preferredVelocity;
+      this.setAgentData(agents, i, [x, z], c, [0, 0], s, [-x,-z]);
     }
   }
 
