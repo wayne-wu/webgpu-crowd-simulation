@@ -61,7 +61,7 @@ export class ComputeBufferManager {
 
     this.agentPositionOffset = 0;
     this.agentColorOffset = 4 * 4;
-    this.agentVelocityOffset = 8 * 4;
+    this.agentVelocityOffset = 20 * 4;
 
     this.numAgents = Math.pow(2, Math.ceil(Math.log2(numAgents)));
     this.numValidAgents = numAgents;
@@ -80,6 +80,8 @@ export class ComputeBufferManager {
       1 * 4 + // preferred speed
       3 * 4 + // goal
       1 * 4 + // cell
+      3 * 4 + // dir
+      1 * 4 + // group
       0;
 
     this.obstacleInstanceSize =
@@ -309,10 +311,14 @@ export class ComputeBufferManager {
     agents[offset + 16] = goal[0];
     agents[offset + 17] = minY;
     agents[offset + 18] = goal[1];
+
+    agents[offset + 20] = goal[0] - position[0];
+    agents[offset + 21] = 0;
+    agents[offset + 22] = goal[1] - position[1];
   }
 
   initProximal(agents : Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length/2; ++i) {
+    for (let i = 0; i < this.numAgents/2; ++i) {
       let x = Math.floor(i/10);
       let z = i%10 + 5;
       let v = 0.5;
@@ -322,7 +328,7 @@ export class ComputeBufferManager {
   }
 
   initBottleneck(agents : Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length; ++i) {
+    for (let i = 0; i < this.numAgents; ++i) {
       let x = i%20 - 10;
       let z = Math.floor(i/20) + 10;
       let v = 0.5;
@@ -336,7 +342,7 @@ export class ComputeBufferManager {
   }
 
   initDense(agents : Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length/2; ++i) {
+    for (let i = 0; i < this.numAgents/2; ++i) {
       let x = i%100 - 50;
       let z = Math.floor(i/100) + 10;
       let v = 0.5;
@@ -346,7 +352,7 @@ export class ComputeBufferManager {
   }
 
   initSparse(agents: Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length/2; ++i) {
+    for (let i = 0; i < this.numAgents/2; ++i) {
       let x = 2*(i%100) - 50;
       let z = 2*Math.floor(i/100) + 10;
       let v = 0.5;
@@ -357,7 +363,7 @@ export class ComputeBufferManager {
   }
 
   initObstacles(agents: Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length/2; ++i) {
+    for (let i = 0; i < this.numAgents/2; ++i) {
       let x = i%100 - 50;
       let z = Math.floor(i/100) + 10;
       let v = 0.5;
