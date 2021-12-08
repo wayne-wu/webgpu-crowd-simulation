@@ -274,7 +274,7 @@ export class ComputeBufferManager {
     data[offset + 3] = rotation; //rotation
 
     data[offset + 4] = scale[0];
-    data[offset + 5] = obstacleHeight;
+    data[offset + 5] = obstacleHeight / 2.0;
     data[offset + 6] = scale[1];
   }
 
