@@ -93,6 +93,8 @@ export class ComputeBufferManager {
       1 * 4 + // avoidance (int)
       1 * 4 + // numAgents
       1 * 4 + // gridWidth
+      1 * 4 + // iteration
+      3 * 4 + // padding
       0;
 
     this.cellInstanceSize = 
@@ -173,6 +175,16 @@ export class ComputeBufferManager {
         simulationParams.avoidance,
         this.numAgents,
         this.gridWidth
+      ])
+    );
+  }
+
+  setIteration(itr: number){
+    this.device.queue.writeBuffer(
+      this.simulationUBOBuffer,
+      4*4,
+      new Int32Array([
+        itr
       ])
     );
   }

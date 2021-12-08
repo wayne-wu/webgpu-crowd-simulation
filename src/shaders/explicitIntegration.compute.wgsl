@@ -12,6 +12,7 @@ let maxNeighbors : u32 = 20u;
   avoidance : f32;
   numAgents : f32;
   gridWidth : f32;
+  iteration : i32;
 };
 
 struct Agent {

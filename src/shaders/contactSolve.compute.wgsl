@@ -14,6 +14,7 @@ let mu_kinematic : f32 = 0.15;
   avoidance : f32;
   numAgents : f32;
   gridWidth : f32;
+  iteration : i32;
 };
 
 struct Agent {
