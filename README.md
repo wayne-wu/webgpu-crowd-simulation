@@ -11,7 +11,7 @@ This project attempts to implement a real-time crowd simulation based on the pap
 Unlike the paper which uses CUDA and Unreal Engine for simulation and rendering,
 this project uses WebGPU for both.
 
-![Real-Time Crowd Simulation GIF](img/milestone1_progress.gif)
+![Real-Time Crowd Simulation GIF](img/obstacle_example.gif)
 
 ## Neighbor Searching
 
@@ -38,6 +38,7 @@ As shown in the image below, the agents start reacting before they are even clos
 ### Cohesion
 
 ### Obstacles Avoidance
+![Obstacle Avoidance](img/obstacle_example.gif)
 
 ### Parameters Tuning
 
