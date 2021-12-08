@@ -11,6 +11,7 @@ let nearRadius : f32 = 2.0;
   avoidance : f32;
   numAgents : f32;
   gridWidth : f32;
+  iteration : i32;
 };
 
 struct Agent {

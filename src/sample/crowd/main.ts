@@ -336,8 +336,6 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     camera.update();
 
-    const commandEncoder = device.createCommandEncoder();
-
     //------------------ Compute Calls ------------------------ //
     {
       if (prevNumAgents != simulationParams.numAgents) {
@@ -402,12 +400,14 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         resetSim = false;
       }
 
+      var computeCommand = device.createCommandEncoder();
+
       // write the parameters to the Uniform buffer for our compute shaders
       compBuffManager.writeSimParams(simulationParams);
 
       // execute each compute shader in the order they were pushed onto
       // the computePipelines array
-      const passEncoder = commandEncoder.beginComputePass();
+      var passEncoder = computeCommand.beginComputePass();
       //// ----- Compute Pass Before Sort -----
       for (let i = 0; i < computePipelinesPreSort.length; i++){
         passEncoder.setPipeline(computePipelinesPreSort[i]);
@@ -423,9 +423,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         // kick off the compute shader
         passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 256));
       }
-
-      // ----- Compute Pass After Sort -----
-      for (let i = 0; i < computePipelinesPostSort.length; i++){
+      
+      // ----- Compute Pass Post Sort 1 -----
+      const constraintShaderIdx = 2;
+      for (let i = 0; i < constraintShaderIdx; i++){
         passEncoder.setPipeline(computePipelinesPostSort[i]);
         passEncoder.setBindGroup(0, computeBindGroup);
         // kick off the compute shader
@@ -433,17 +434,46 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       }
       passEncoder.endPass();
 
+      device.queue.submit([computeCommand.finish()])
+      
+      // ----- Compute Pass Constraint Solve -----
+      // Since WebGPU does not support push constants, need to add write buffer to queue
+      // SEE: https://github.com/gpuweb/gpuweb/issues/762#issuecomment-625622428
+      for (let i = 0; i < 6; i++) {
+        computeCommand = device.createCommandEncoder();
+        compBuffManager.setIteration(i+1);  // Set iteration number for compute shader
+        passEncoder = computeCommand.beginComputePass();
+        passEncoder.setPipeline(computePipelinesPostSort[constraintShaderIdx]);
+        passEncoder.setBindGroup(0, computeBindGroup);
+        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 64));
+        passEncoder.endPass();
+        device.queue.submit([computeCommand.finish()]);
+      }      
+
+      // ----- Compute Pass Post Sort 2 -----
+      computeCommand = device.createCommandEncoder();
+      passEncoder = computeCommand.beginComputePass();
+      for (let i = constraintShaderIdx+1; i < computePipelinesPostSort.length; i++){
+        passEncoder.setPipeline(computePipelinesPostSort[i]);
+        passEncoder.setBindGroup(0, computeBindGroup);
+        // kick off the compute shader
+        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 64));
+      }
+      passEncoder.endPass();
+
+      device.queue.submit([computeCommand.finish()])
     }
 
     // ------------------ Render Calls ------------------------- //
     if (bufManagerExists) {
+      const renderCommand = device.createCommandEncoder();
       const transformationMatrix = getTransformationMatrix();
 
       renderBuffManager.renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
 
-      const passEncoder = commandEncoder.beginRenderPass(renderBuffManager.renderPassDescriptor);
+      const passEncoder = renderCommand.beginRenderPass(renderBuffManager.renderPassDescriptor);
 
       // ----------------------- Draw ------------------------- //
       renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder);
@@ -458,9 +488,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         renderBuffManager.drawObstacles(device, vp, passEncoder, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
 
       passEncoder.endPass();
+      device.queue.submit([renderCommand.finish()]);
     }
 
-    device.queue.submit([commandEncoder.finish()]);
     requestAnimationFrame(frame);
     stats.end();
   }

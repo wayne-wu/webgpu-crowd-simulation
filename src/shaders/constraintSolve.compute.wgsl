@@ -15,6 +15,7 @@ let farRadius : f32 = 5.0;
   avoidance : f32;
   numAgents : f32;
   gridWidth : f32;
+  iteration : i32;
 };
 
 struct Agent {
@@ -212,82 +213,73 @@ fn obstacle_constraint(agent: Agent, obstacle: Obstacle, itr: i32, count: ptr<fu
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
 
-  var itr = 0;
-  loop {
-    if (itr == maxIterations){ break; }
-    
-    var agent = agentData.agents[idx];
-    var totalDx = vec3<f32>(0.0, 0.0, 0.0);
-    var neighborCount = 0;
-    let dt = sim_params.deltaTime;
+  var itr = sim_params.iteration;
 
-    // 4.4 Long Range Collision
-    if (agent.cell < 0){
-      // ignore invalid cells
-      agent.c = vec4<f32>(1.0, 0.0, 0.0, 1.0);
-      agentData.agents[idx] = agent;
-      return;
+  var agent = agentData.agents[idx];
+  var totalDx = vec3<f32>(0.0, 0.0, 0.0);
+  var neighborCount = 0;
+  let dt = sim_params.deltaTime;
+
+  // 4.4 Long Range Collision
+  if (agent.cell < 0){
+    // ignore invalid cells
+    agent.c = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+    agentData.agents[idx] = agent;
+    return;
+  }
+
+  let gridWidth = i32(sim_params.gridWidth);
+  let gridHeight = i32(sim_params.gridWidth);
+  // compute neighbors
+  var nearCount = 0u;
+  var farCount = 0u;
+  //// TODO don't hardcode 9 cells 
+  let cellsToCheck = 9u;
+  var nearCellNums = array<i32, 9u>(
+    agent.cell + gridWidth - 1, agent.cell + gridWidth, agent.cell + gridWidth + 1,
+    agent.cell - 1, agent.cell, agent.cell+1, 
+    agent.cell - gridWidth - 1, agent.cell - gridWidth, agent.cell - gridWidth + 1);
+
+  for (var c : u32 = 0u; c < cellsToCheck; c = c + 1u ){
+    let cellIdx = nearCellNums[c];
+    if (cellIdx < 0 || cellIdx >= gridWidth * gridHeight){
+      continue;
     }
+    let cell : CellIndices = grid.cells[cellIdx];
+    for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
 
-    let gridWidth = i32(sim_params.gridWidth);
-    let gridHeight = i32(sim_params.gridWidth);
-    // compute neighbors
-    var nearCount = 0u;
-    var farCount = 0u;
-    //// TODO don't hardcode 9 cells 
-    let cellsToCheck = 9u;
-    var nearCellNums = array<i32, 9u>(
-      agent.cell + gridWidth - 1, agent.cell + gridWidth, agent.cell + gridWidth + 1,
-      agent.cell - 1, agent.cell, agent.cell+1, 
-      agent.cell - gridWidth - 1, agent.cell - gridWidth, agent.cell - gridWidth + 1);
+      if (idx == i) { 
+        // ignore ourselves
+        continue; 
+      }
+      let agent_j = agentData.agents[i];
 
-    for (var c : u32 = 0u; c < cellsToCheck; c = c + 1u ){
-      let cellIdx = nearCellNums[c];
-      if (cellIdx < 0 || cellIdx >= gridWidth * gridHeight){
+      let dist = distance(agent.x, agent_j.x);
+
+      if (dist >= farRadius){
         continue;
       }
-      let cell : CellIndices = grid.cells[cellIdx];
-      for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
 
-        if (idx == i) { 
-          // ignore ourselves
-          continue; 
-        }
-        let agent_j = agentData.agents[i];
-
-        let dist = distance(agent.x, agent_j.x);
-
-        if (dist >= farRadius){
-          continue;
-        }
-
-        long_range_constraint(agent, agent_j, itr, &neighborCount, &totalDx);
-      }
+      long_range_constraint(agent, agent_j, itr, &neighborCount, &totalDx);
     }
-
-    if (neighborCount > 0) {
-      agent.xp = agent.xp + avgCoefficient * totalDx / f32(neighborCount);
-    }
-
-    totalDx = vec3<f32>(0.0);
-    neighborCount = 0;
-
-    // 4.7 Obstacles Avoidance
-    for (var j : u32 = 0u; j < arrayLength(&obstacleData.obstacles); j = j + 1u){
-      obstacle_constraint(agent, obstacleData.obstacles[j], itr, &neighborCount, &totalDx);
-    }
-
-    if (neighborCount > 0) {
-      agent.xp = agent.xp + avgCoefficient * totalDx / f32(neighborCount);
-    }
-
-    // Store the new agent value
-    agentData.agents[idx] = agent;
-
-    // Sync Threads
-    // storageBarrier();
-    // workgroupBarrier();
-
-    itr = itr + 1;
   }
+
+  if (neighborCount > 0) {
+    agent.xp = agent.xp + avgCoefficient * totalDx / f32(neighborCount);
+  }
+
+  totalDx = vec3<f32>(0.0);
+  neighborCount = 0;
+
+  // 4.7 Obstacles Avoidance
+  for (var j : u32 = 0u; j < arrayLength(&obstacleData.obstacles); j = j + 1u){
+    obstacle_constraint(agent, obstacleData.obstacles[j], itr, &neighborCount, &totalDx);
+  }
+
+  if (neighborCount > 0) {
+    agent.xp = agent.xp + avgCoefficient * totalDx / f32(neighborCount);
+  }
+
+  // Store the new agent value
+  agentData.agents[idx] = agent;
 }
