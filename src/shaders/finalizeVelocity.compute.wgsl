@@ -2,43 +2,6 @@
 // Finalize Velocity Compute Shader
 ////////////////////////////////////////////////////////////////////////////////
 
-let xsph_c : f32 = 7.0;    // paper = 7.0
-let xsph_h : f32 = 217.0;  // paper = 217.0 // the smoothing distance specified in the paper (assumes particles with radius 1)
-let nearRadius : f32 = 2.0;
-
-[[block]] struct SimulationParams {
-  deltaTime : f32;
-  avoidance : f32;
-  numAgents : f32;
-  gridWidth : f32;
-  iteration : i32;
-};
-
-struct Agent {
-  x  : vec3<f32>;  // position + radius
-  r  : f32;
-  c  : vec4<f32>;  // color
-  v  : vec3<f32>;  // velocity + inverse mass
-  w  : f32;
-  xp : vec3<f32>;  // planned/predicted position
-  speed : f32;
-  goal : vec3<f32>;
-  cell : i32;
-};
-
-[[block]] struct Agents {
-  agents : array<Agent>;
-};
-
-struct CellIndices {
-  start : u32;
-  end   : u32;
-};
-
-[[block]] struct Grid {
-  cells : array<CellIndices>;
-};
-
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 [[binding(2), group(0)]] var<storage, read> grid : Grid;
