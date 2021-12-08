@@ -13,6 +13,7 @@ import buildHashGrid from '../../shaders/buildHashGrid.compute.wgsl';
 import contactSolveWGSL from '../../shaders/contactSolve.compute.wgsl';
 import constraintSolveWGSL from '../../shaders/constraintSolve.compute.wgsl';
 import finalizeVelocityWGSL from '../../shaders/finalizeVelocity.compute.wgsl';
+import headerWGSL from '../../shaders/header.compute.wgsl';
 
 import {loadModel, Mesh} from "../../meshes/mesh";
 import { meshDictionary } from './meshDictionary';
@@ -33,22 +34,6 @@ function getSortStepWGSL(numAgents : number, k : number, j : number, ){
   // race conditions. The least gross way I can think to do that is to create a new pipeline
   // for each step.
   let baseWGSL = `
-  struct Agent {
-    x  : vec3<f32>;  // position + radius
-    r  : f32;
-    c  : vec4<f32>;  // color
-    v  : vec3<f32>;  // velocity + inverse mass
-    w  : f32;
-    xp : vec3<f32>;  // planned/predicted position
-    speed : f32;
-    goal : vec3<f32>;
-    cell : i32;
-  };
-
-  [[block]] struct Agents {
-    agents : array<Agent>;
-  };
-
   [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 
   fn swap(idx1 : u32, idx2 : u32) {
@@ -102,7 +87,7 @@ function fillSortPipelineList(device,
             }),
             compute: {
               module: device.createShaderModule({
-                code: getSortStepWGSL(numAgents, k, j),
+                code: headerWGSL + getSortStepWGSL(numAgents, k, j),
               }),
               entryPoint: 'main',
             },
@@ -232,14 +217,14 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //////////////////////////////////////////////////////////////////////////////
   {
     var computeShadersPreSort = [
-      explicitIntegrationWGSL, 
-      assignCellsWGSL,
+      headerWGSL + explicitIntegrationWGSL, 
+      headerWGSL + assignCellsWGSL,
     ];
     var computeShadersPostSort = [
-      buildHashGrid,
-      contactSolveWGSL, 
-      constraintSolveWGSL, 
-      finalizeVelocityWGSL
+      headerWGSL + buildHashGrid,
+      headerWGSL + contactSolveWGSL, 
+      headerWGSL + constraintSolveWGSL, 
+      headerWGSL + finalizeVelocityWGSL
     ];
     var computePipelinesPreSort = [];
     var computePipelinesSort = [];
@@ -351,7 +336,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         prevTestScene = simulationParams.testScene;
         switch(simulationParams.testScene) {
           case TestScene.PROXIMAL:
-            resetCameraFunc(10,10,10);
+            resetCameraFunc(5,10,5);
             compBuffManager.numValidAgents = 1<<6;
             simulationParams.numObstacles = 0;
             break;

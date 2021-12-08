@@ -2,57 +2,6 @@
 // PBD Constraint Solving Compute Shader
 ////////////////////////////////////////////////////////////////////////////////
 
-let maxIterations : i32 = 6;     // paper = 6
-let t0 : f32 = 20.0;             // paper = 20
-let tObstacle : f32 = 10.0;
-let kUser : f32 = 0.15;          // paper = 0.24 [0-1]
-let kObstacle : f32 = 1.0;
-let avgCoefficient : f32 = 1.2;  // paper = 1.2  [1-2]
-let farRadius : f32 = 5.0;
-
-[[block]] struct SimulationParams {
-  deltaTime : f32;
-  avoidance : f32;
-  numAgents : f32;
-  gridWidth : f32;
-  iteration : i32;
-};
-
-struct Agent {
-  x  : vec3<f32>;  // position + radius
-  r  : f32;
-  c  : vec4<f32>;  // color
-  v  : vec3<f32>;  // velocity + inverse mass
-  w  : f32;
-  xp : vec3<f32>;  // planned/predicted position
-  speed : f32;
-  goal : vec3<f32>;
-  cell : i32;
-};
-
-[[block]] struct Agents {
-  agents : array<Agent>;
-};
-
-struct CellIndices {
-  start : u32;
-  end   : u32;
-};
-
-[[block]] struct Grid {
-  cells : array<CellIndices>;
-};
-
-struct Obstacle {
-  pos : vec3<f32>;
-  rot : f32;
-  scale : vec3<f32>;
-};
-
-[[block]] struct Obstacles {
-  obstacles : array<Obstacle>;
-};
-
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 [[binding(2), group(0)]] var<storage, read> grid : Grid;
@@ -110,7 +59,7 @@ fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<func
   if (f < 0.0) {
     n = normalize(n);
     
-    var k = kUser * exp(-t_nocollision*t_nocollision/t0);
+    var k = k_longrange * exp(-t_nocollision*t_nocollision/t0);
     k = 1.0 - pow(1.0 - k, 1.0/(f32(itr + 1)));
     let w = agent.w / (agent.w + agent_j.w);
     var dx = -w * f * n;
@@ -201,7 +150,7 @@ fn obstacle_constraint(agent: Agent, obstacle: Obstacle, itr: i32, count: ptr<fu
     // Use the radial normal as the contact normal so that there's some tangential velocity
     var n = normalize((agent.xp + t_min * v) - obstacle.pos);
 
-    var k = kObstacle * exp(-t_min*t_min/tObstacle);
+    var k = k_obstacle * exp(-t_min*t_min/tObstacle);
     k = 1.0 - pow(1.0 - k, 1.0/(f32(itr + 1)));
     var dx = k * n;
     *totalDx = *totalDx + dx;

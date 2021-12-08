@@ -2,46 +2,6 @@
 // Stability Solve & Short Range Collision 
 ////////////////////////////////////////////////////////////////////////////////
 
-let maxIterations : i32 = 1;  // paper = 1
-let stiffness : f32 = 1.0;  // paper = 1.0 [0,1]
-let avgCoefficient : f32 = 1.2;  // paper = 1.2 [1,2]
-let nearRadius : f32 = 2.0;
-let mu_static : f32 = 0.21;  // paper = 0.21
-let mu_kinematic : f32 = 0.15;
-
-[[block]] struct SimulationParams {
-  deltaTime : f32;
-  avoidance : f32;
-  numAgents : f32;
-  gridWidth : f32;
-  iteration : i32;
-};
-
-struct Agent {
-  x  : vec3<f32>;  // position + radius
-  r  : f32;
-  c  : vec4<f32>;  // color
-  v  : vec3<f32>;  // velocity + inverse mass
-  w  : f32;
-  xp : vec3<f32>;  // planned/predicted position
-  speed : f32;
-  goal : vec3<f32>;
-  cell : i32;
-};
-
-[[block]] struct Agents {
-  agents : array<Agent>;
-};
-
-struct CellIndices {
-  start : u32;
-  end   : u32;
-};
-
-[[block]] struct Grid {
-  cells : array<CellIndices>;
-};
-
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
 [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 [[binding(2), group(0)]] var<storage, read> grid : Grid;
@@ -98,7 +58,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
         // 4.2 Short Range Collision
         n = normalize(n);
         let w = agent.w / (agent.w + agent_j.w);
-        var dx = -w * stiffness * f * n;
+        var dx = -w * k_shortrange * f * n;
         totalDx = totalDx + dx;
         neighborCount = neighborCount + 1;
 
