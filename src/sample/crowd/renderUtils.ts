@@ -134,7 +134,7 @@ export class RenderBufferManager {
         {
           view: undefined, // Assigned later
 
-          loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+          loadValue: { r: 0.89, g: 0.92, b: 1.0, a: 1.0 },
           storeOp: 'store',
         },
       ],
