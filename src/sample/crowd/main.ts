@@ -144,19 +144,13 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   let prevNumAgents = simulationParams.numAgents;
   let prevTestScene = TestScene.DENSE;
-
+  
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
   simFolder.add(simulationParams, 'numAgents', 10, 100000, 2);
   simFolder.add(simulationParams, 'avoidance');
-  simFolder.add(simulationParams, 'testScene', {
-    'Proximal Behavior': TestScene.PROXIMAL, 
-    'Bottleneck': TestScene.BOTTLENECK,
-    'Dense Passing': TestScene.DENSE,
-    'Sparse Passing': TestScene.SPARSE,
-    'Obstacles': TestScene.OBSTACLES,
-  });
+  simFolder.add(simulationParams, 'testScene', Object.values(TestScene));
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
@@ -164,7 +158,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     model: 'Duck'
   }
   let prevModel = 'Duck';
-  gui.add(modelParams, 'model', Array.from(Object.keys(meshDictionary)));
+  let models = Array.from(Object.keys(meshDictionary));
+  models.push('Cube');
+  gui.add(modelParams, 'model', models);
 
 
   /////////////////////////////////////////////////////////////////////////
@@ -311,7 +307,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   }
 
   // get compute bind group
-  var computeBindGroup = compBuffManager.getBindGroup();
+  var computeBindGroup1 = compBuffManager.getBindGroup(false);
+  var computeBindGroup2 = compBuffManager.getBindGroup(true);
 
   function getTransformationMatrix() {
     const modelMatrix = mat4.create();
@@ -413,6 +410,11 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             simulationParams.numObstacles = 5;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
+          case TestScene.CIRCLE:
+            resetCameraFunc(5,20,5);
+            compBuffManager.numValidAgents = 1<<6;
+            simulationParams.numObstacles = 0;
+            break;
         }
         resetSim = true;
       }
@@ -428,7 +430,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
         // reinitilize buffers based on the new number of agents
         compBuffManager.initBuffers();
-        computeBindGroup = compBuffManager.getBindGroup();
+
+        computeBindGroup1 = compBuffManager.getBindGroup(false);  // READ agents1 WRITE agents2
+        computeBindGroup2 = compBuffManager.getBindGroup(true);   // READ agents2 WRITE agents1
+        
         // the number of steps in the sort pipeline is proportional
         // to log2 the number of agents, so reinitiliaze it
         fillSortPipelineList(device, 
@@ -439,6 +444,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       }
 
       var computeCommand = device.createCommandEncoder();
+      var computeBindGroup = computeBindGroup1;
 
       if (simulationParams.simulate) {
       // write the parameters to the Uniform buffer for our compute shaders
@@ -476,6 +482,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       device.queue.submit([computeCommand.finish()]);
     
       
+      // Stability/Contact solve will write to different buffer
+      computeBindGroup = computeBindGroup2;
+
       // ----- Compute Pass Constraint Solve -----
       // Since WebGPU does not support push constants, need to add write buffer to queue
       // SEE: https://github.com/gpuweb/gpuweb/issues/762#issuecomment-625622428
@@ -488,6 +497,12 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 64));
         passEncoder.endPass();
         device.queue.submit([computeCommand.finish()]);
+
+        // ping-pong buffers
+        if(computeBindGroup == computeBindGroup1)
+          computeBindGroup = computeBindGroup2;
+        else if(computeBindGroup == computeBindGroup2)
+          computeBindGroup = computeBindGroup1;
       }      
 
       // ----- Compute Pass Post Sort 2 -----
@@ -523,7 +538,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       const vp = getViewProjection();
       const camPos = vec3.fromValues(camera.controls.eye[0], camera.controls.eye[1], camera.controls.eye[2]) ;
-      renderBuffManager.drawCrowd(device, vp, passEncoder, compBuffManager.agentsBuffer, compBuffManager.numAgents, camPos);
+      let agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents1Buffer : compBuffManager.agents2Buffer;
+      renderBuffManager.drawCrowd(device, vp, passEncoder, agentsBuffer, compBuffManager.numAgents, camPos);
 
       if (simulationParams.numObstacles > 0)
         renderBuffManager.drawObstacles(device, vp, passEncoder, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);

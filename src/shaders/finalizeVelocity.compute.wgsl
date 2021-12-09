@@ -3,8 +3,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
-[[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
-[[binding(2), group(0)]] var<storage, read> grid : Grid;
+[[binding(1), group(0)]] var<storage, read> agentData_r : Agents;
+[[binding(2), group(0)]] var<storage, write> agentData_w : Agents;
+[[binding(3), group(0)]] var<storage, read> grid : Grid;
 
 fn getW(d : f32) -> f32 {
     var w = 0.0; // poly6 smoothing kernel
@@ -19,9 +20,10 @@ fn getW(d : f32) -> f32 {
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
-  var agent = agentData.agents[idx];
+  var agent = agentData_r.agents[idx];
 
   // PBD: Get new velocity from corrected position
+  var last_v = agent.v;
   agent.v = (agent.xp - agent.x)/sim_params.deltaTime;
 
   // 4.3 Cohesion
@@ -31,7 +33,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   if (agent.cell < 0){
     // ignore invalid cells
     agent.c = vec4<f32>(0.5, 0.5, 0.5, 1.0);
-    agentData.agents[idx] = agent;
+    agentData_w.agents[idx] = agent;
     return;
   }
 
@@ -60,7 +62,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
         continue; 
       }
 
-      var neighbor = agentData.agents[i];
+      var neighbor = agentData_r.agents[i];
       var d = distance(agent.x, neighbor.x);  // Should this be xp or x?
       if (d >= nearRadius){
         continue;
@@ -73,15 +75,18 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
   // 4.6 Maximum Speed and Acceleration Limiting
 
+  let v_dir = normalize(agent.v);
   let maxSpeed : f32 = agent.speed;
   if(length(agent.v) > maxSpeed){
-    agent.v = maxSpeed * normalize(agent.v);
+    agent.v = maxSpeed * v_dir;
   }
 
   // Set new position to be the corrected position
   // Reintegrate here so that the position doesn't jump between frames
   agent.x = agent.x + agent.v * sim_params.deltaTime;
-  
+
+  agent.dir = dir_blending * normalize(agent.dir) + (1.0 - dir_blending) * v_dir;
+
   // Store the new agent value
-  agentData.agents[idx] = agent;
+  agentData_w.agents[idx] = agent;
 }

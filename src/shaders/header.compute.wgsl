@@ -12,7 +12,9 @@ let mu_kinematic : f32 = 0.15;  // papser = ?
 let ksi : f32 = 0.0385;         // paper = 0.0385
 let xsph_c : f32 = 7.0;         // paper = 7.0
 let xsph_h : f32 = 217.0;       // paper = 217.0 // the smoothing distance specified in the paper (assumes particles with radius 1)
+let dir_blending : f32 = 0.8;   
 
+let friction : bool = true;
 
 // ----- Struct -----
 [[block]] struct SimulationParams {
@@ -33,6 +35,8 @@ struct Agent {
   speed : f32;
   goal : vec3<f32>;
   cell : i32;
+  dir : vec3<f32>;
+  group : i32;
 };
 
 [[block]] struct Agents {

@@ -3,21 +3,23 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
-[[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
-[[binding(2), group(0)]] var<storage, read> grid : Grid;
+[[binding(1), group(0)]] var<storage, read> agentData_r : Agents;
+[[binding(2), group(0)]] var<storage, write> agentData_w : Agents;
+[[binding(3), group(0)]] var<storage, read> grid : Grid;
+//[[binding(4), group(0)]] var<storage, read> obstacleData : Obstacles;
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
 
-  var agent = agentData.agents[idx];
+  var agent = agentData_r.agents[idx];
   var totalDx = vec3<f32>(0.0, 0.0, 0.0);
   var neighborCount = 0;
 
   if (agent.cell < 0){
     // ignore invalid cells
     agent.c = vec4<f32>(1.0, 0.0, 0.0, 1.0);
-    agentData.agents[idx] = agent;
+    agentData_w.agents[idx] = agent;
     return;
   }
 
@@ -45,7 +47,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
         continue; 
       }
 
-      let agent_j = agentData.agents[i];
+      let agent_j = agentData_r.agents[i];
 
       var n = agent.xp - agent_j.xp;
       let d = length(n);
@@ -62,23 +64,25 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
         totalDx = totalDx + dx;
         neighborCount = neighborCount + 1;
 
-        // 4.2 Friction Contact (See 6.1 of https://mmacklin.com/uppfrta_preprint.pdf)
-        // Add friction to slow down agents if collision is detected
-        
-        // Get corrected positions
-        var xi = agent.xp + dx; 
-        var xj = agent_j.xp - dx;  // assumes mass are the same
+        if (friction) {
+          // 4.2 Friction Contact (See 6.1 of https://mmacklin.com/uppfrta_preprint.pdf)
+          // Add friction to slow down agents if collision is detected
+          
+          // Get corrected positions
+          var xi = agent.xp + dx;
+          var xj = agent_j.xp - dx;  // assumes mass are the same
 
-        var d_rel = (xi - agent.x) - (xj - agent_j.x);
-        dx = d_rel - dot(d_rel, n) * n;  // project to tangential component
-        var dx_norm = length(dx); 
-        if(dx_norm >= mu_static * d) {
-          dx = min(mu_kinematic * d/dx_norm, 1.0) * dx;
+          var d_rel = (xi - agent.x) - (xj - agent_j.x);
+          dx = d_rel - dot(d_rel, n) * n;  // project to tangential component
+          var dx_norm = length(dx); 
+          if(dx_norm >= mu_static * d) {
+            dx = min(mu_kinematic * d/dx_norm, 1.0) * dx;
+          }
+          dx = w * dx;
+
+          totalDx = totalDx + dx;
+          neighborCount = neighborCount + 1;
         }
-        dx = w * dx;
-
-        totalDx = totalDx + dx;
-        neighborCount = neighborCount + 1;
       }
     }
 
@@ -93,5 +97,5 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   }
 
   // Store the new agent value
-  agentData.agents[idx] = agent;
+  agentData_w.agents[idx] = agent;
 }
