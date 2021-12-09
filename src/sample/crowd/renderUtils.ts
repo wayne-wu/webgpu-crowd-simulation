@@ -64,23 +64,19 @@ export class RenderBufferManager {
 
   mesh                    : Mesh;
 
-  constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, mesh : Mesh) 
+  constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, 
+               mesh : Mesh, gridTexture: GPUTexture, sampler) 
   {
     this.device = device;
     this.mesh = mesh;
     this.initBuffers(gridWidth);
     this.buildPipelines(presentationFormat, cbm);
-    this.setBindGroups();
+    this.setBindGroups(gridTexture, sampler);
     this.setRenderPassDescriptor(presentationSize);
   }
 
   initBuffers(gridWidth: number) {
-    // Create vertex buffers for the platform and the grid lines
     this.platformVertexBuffer = getVerticesBuffer(this.device, platformVertexArray);
-
-    // Compute the grid lines based on an input gridWidth
-    //let gridLinesVertexArray = getGridLines(gridWidth);
-    //this.gridLinesVertexBuffer = getVerticesBuffer(this.device, gridLinesVertexArray);
 
     this.prototypeVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
     this.obstacleVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
@@ -95,32 +91,25 @@ export class RenderBufferManager {
       platformPositionOffset, platformUVOffset, platformNorOffset, presentationFormat, 'triangle-list', 'back'
     );
 
-    // this.gridLinesPipeline = getPipeline(
-    //   this.device, renderWGSL, 'vs_main', 'fs_gridLines', gridLinesVertexSize,
-    //   gridLinesPositionOffset, gridLinesUVOffset, presentationFormat, 'line-list', 'none'
-    // );
-
     this.crowdPipeline = getCrowdRenderPipeline(
       this.device, crowdWGSL, cbm.agentInstanceSize, cbm.agentPositionOffset, 
       cbm.agentColorOffset, cbm.agentVelocityOffset, this.mesh.normalOffset, this.mesh.itemSize, this.mesh.posOffset, 
-      this.mesh.uvOffset, presentationFormat);
+      this.mesh.uvOffset, this.mesh.colorOffset, presentationFormat);
 
     this.obstaclesPipeline = getObstaclesRenderPipeline(
       this.device, obstaclesWGSL, cbm.obstacleInstanceSize, 0, 
       cubeVertexSize, cubePositionOffset, cubeUVOffset, cubeNorOffset, presentationFormat);
   }
 
-  setBindGroups() {
+  setBindGroups(gridTexture: GPUTexture, sampler: GPUSampler) {
     // NOTE: Is there really no way to share the same uniform buffer across different pipelines?
     // Seems very efficient to have to redeclare pretty much the same data multiple times
     let mvpSize = 4 * 16;  // mat4
-    this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize);
-    //this.gridLinesUniformBuffer = getUniformBuffer(this.device, mvpSize);
+    this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4);
     this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize + 3*4 + 1*4);
     this.obstaclesUniformBuffer = getUniformBuffer(this.device, mvpSize);
 
-    this.platformBindGroup = getUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer);
-    //this.gridLinesBindGroup = getUniformBindGroup(this.device, this.gridLinesPipeline, this.gridLinesUniformBuffer);
+    this.platformBindGroup = getTexturedUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer, gridTexture, sampler);
     this.crowdBindGroup = getUniformBindGroup(this.device, this.crowdPipeline, this.crowdUniformBuffer);
     this.obstaclesBindGroup = getUniformBindGroup(this.device, this.obstaclesPipeline, this.obstaclesUniformBuffer);
   }
@@ -155,13 +144,19 @@ export class RenderBufferManager {
     this.gridLinesVertexBuffer = getVerticesBuffer(this.device, gridLinesVertexArray);
   }
 
-  drawPlatform(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder) {
+  drawPlatform(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder, gridOn: boolean) {
+    const gridOnArray = new Float32Array([gridOn ? 1.0 : 0.0]);
     device.queue.writeBuffer(
       this.platformUniformBuffer,
       0,
       transformationMatrix.buffer,
       transformationMatrix.byteOffset,
       transformationMatrix.byteLength
+    );
+    device.queue.writeBuffer(
+      this.platformUniformBuffer,
+      transformationMatrix.byteLength,
+      gridOnArray
     );
     passEncoder.setPipeline(this.platformPipeline);
     passEncoder.setBindGroup(0, this.platformBindGroup);
@@ -313,7 +308,7 @@ const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryP
 }
 
 const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, velOffset: number, vertNorOffset: number,
-                                       vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
+                                       vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, vertColorOffset: number, presentationFormat) => {
   let buffers = [
     {
       // instanced agents buffer
@@ -361,6 +356,12 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
           offset: vertNorOffset,
           format: 'float32x4'
         },
+        {
+          // mesh color
+          shaderLocation: 6,
+          offset: vertColorOffset,
+          format: 'float32x3'
+        }
         ],
     },   
   ];
@@ -457,6 +458,29 @@ const getUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uni
         buffer: uniformBuffer,
       },
     },
+  ],
+  });
+  return uniformBindGroup;
+}
+
+const getTexturedUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uniformBuffer: GPUBuffer, textureBuffer: GPUTexture, sampler) => {
+  const uniformBindGroup = device.createBindGroup({
+  layout: pipeline.getBindGroupLayout(0),
+  entries: [
+    {
+      binding: 0,
+      resource: {
+        buffer: uniformBuffer,
+      },
+    },
+    {
+      binding: 1,
+      resource: sampler
+    },
+    {
+      binding: 2,
+      resource: textureBuffer.createView()
+    }
   ],
   });
   return uniformBindGroup;

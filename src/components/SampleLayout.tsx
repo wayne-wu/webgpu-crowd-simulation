@@ -130,6 +130,9 @@ const SampleLayout: React.FunctionComponent<
 
   const [error, setError] = useState<unknown | null>(null);
 
+  let canvasWidth = canvasRef.current != null ? canvasRef.current.width : 1600;
+  let canvasHeight = canvasRef.current != null ? canvasRef.current.height : 800;
+
   const [activeHash, setActiveHash] = useState<string | null>(null);
   useEffect(() => {
     if (currentHash) {
@@ -197,28 +200,11 @@ const SampleLayout: React.FunctionComponent<
         <title className={styles.title}>{`${props.name}`}</title>
         <meta name="description" content={props.description} />
       </Head>
-      <div>
-        <h1>{props.name}</h1>
-        <a
-          target="_blank"
-          rel="noreferrer"
-          href={`https://github.com/austinEng/webgpu-samples/tree/main/${props.filename}`}
-        >
-          See it on Github!
-        </a>
-        <p>{props.description}</p>
-        {error ? (
-          <>
-            <p>Is WebGPU Enabled?</p>
-            <p>{`${error}`}</p>
-          </>
-        ) : null}
-      </div>
       <div className={styles.canvasContainer}>
         <div
           style={{
             position: 'absolute',
-            right: 10,
+            right: 0
           }}
           ref={guiParentRef}
         ></div>
@@ -229,7 +215,7 @@ const SampleLayout: React.FunctionComponent<
           }}
           ref={statsParentRef}
         ></div>
-        <canvas ref={canvasRef} width={1600} height={900}></canvas>
+        <canvas ref={canvasRef} width={canvasWidth} height={canvasHeight}></canvas>
       </div>
     </main>
   );

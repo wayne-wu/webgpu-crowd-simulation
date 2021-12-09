@@ -27,6 +27,7 @@ struct VertexInput {
   [[location(3)]] mesh_pos : vec4<f32>;  // mesh vertex position (model space)
   [[location(4)]] mesh_uv  : vec2<f32>;  // mesh vertex uv
   [[location(5)]] mesh_nor : vec4<f32>;  // mesh vertex normal
+  [[location(6)]] mesh_col : vec3<f32>;  // mesh vertex color
 };
 
 struct VertexOutput {
@@ -35,6 +36,7 @@ struct VertexOutput {
   [[location(1)]]       mesh_pos : vec4<f32>;
   [[location(2)]]       mesh_uv  : vec2<f32>;
   [[location(3)]]       mesh_nor : vec4<f32>;
+  [[location(4)]]       mesh_col : vec3<f32>;
 };
 
 [[stage(vertex)]]
@@ -72,6 +74,7 @@ fn vs_main(in : VertexInput) -> VertexOutput {
   out.mesh_uv = in.mesh_uv;
   out.mesh_pos = in.mesh_pos;
   out.mesh_nor = rot * in.mesh_nor;
+  out.mesh_col = in.mesh_col;
   return out;
 }
 
@@ -83,5 +86,11 @@ fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
   var cameraDir = in.position.xyz - render_params.cameraPos;
   var lightDir = vec4<f32>(1.0, 1.0, 1.0, 0.0);
   var lambertTerm = dot(normalize(lightDir), normalize(in.mesh_nor));
-  return in.color + 0.8 * lambertTerm * vec4<f32>(1.0, 1.0, 1.0, 1.0);
+
+  var meshCol = vec4<f32>(in.mesh_col, 1.0);
+  if (meshCol.r == 1.0 && meshCol.g == 1.0 && meshCol.b == 1.0){
+    meshCol = in.color;
+  }
+  var albedo = in.color * 0.3 + meshCol * 0.7;
+  return albedo + 0.5 * lambertTerm * vec4<f32>(1.0, 1.0, 1.0, 1.0);
 }

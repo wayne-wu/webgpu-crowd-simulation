@@ -17,6 +17,7 @@ import headerWGSL from '../../shaders/header.compute.wgsl';
 
 import {loadModel, Mesh} from "../../meshes/mesh";
 import { meshDictionary } from './meshDictionary';
+import { cubeVertexArray, cubeVertexCount } from '../../meshes/cube';
 
 let camera : Camera;
 let aspect : number;
@@ -105,6 +106,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   camera = new Camera(vec3.fromValues(50, 50, 50), vec3.fromValues(0, 0, 0));
   aspect = canvasRef.current.width / canvasRef.current.height;
+  //console.log(document.body.clientWidth);
   camera.setAspectRatio(aspect);
   camera.updateProjectionMatrix();
 
@@ -156,7 +158,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     model: 'Duck'
   }
   let prevModel = 'Duck';
-  gui.add(modelParams, 'model', ['Archer', 'Duck', 'Cesium Man']);
+  let models = Array.from(Object.keys(meshDictionary));
+  models.push('Cube');
+  gui.add(modelParams, 'model', models);
 
 
   /////////////////////////////////////////////////////////////////////////
@@ -195,16 +199,53 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //////////////////////////////////////////////////////////////////////////
   var renderBuffManager : RenderBufferManager;
 
+  let gridTexture: GPUTexture;
+  {
+    const img = document.createElement('img');
+    img.src = require('../../../assets/img/checkerboard.png');
+    await img.decode();
+    const imageBitmap = await createImageBitmap(img);
+
+    gridTexture = device.createTexture({
+      size: [imageBitmap.width, imageBitmap.height, 1],
+      format: 'rgba8unorm',
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture(
+      { source: imageBitmap },
+      { texture: gridTexture },
+      [imageBitmap.width, imageBitmap.height]
+    );
+  }
+  // Create a sampler with linear filtering for smooth interpolation.
+  const sampler = device.createSampler({
+    magFilter: 'linear',
+    minFilter: 'linear',
+  });
+
   var bufManagerExists = false;
-  var modelData = meshDictionary[modelParams.model];
-  loadModel(modelData.filename).then((mesh : Mesh) => {
-    mesh.scale = modelData.scale;
+  if (modelParams.model == 'Cube'){
+    let mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
+    mesh.scale = 0.2;
     renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
       presentationFormat, presentationSize,
-      compBuffManager, mesh);
-    
+      compBuffManager, mesh, gridTexture, sampler);
     bufManagerExists = true;
-  });
+  }
+  else{
+    var modelData = meshDictionary[modelParams.model];
+    loadModel(modelData.filename, device).then((mesh : Mesh) => {
+      mesh.scale = modelData.scale;
+      renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
+        presentationFormat, presentationSize,
+        compBuffManager, mesh, gridTexture, sampler);
+      
+      bufManagerExists = true;
+    });
+  }
 
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
@@ -303,15 +344,24 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     if (prevModel != modelParams.model) {
       bufManagerExists = false;
       prevModel = modelParams.model;
+      if (modelParams.model == 'Cube'){
+        let mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
+        mesh.scale = 0.2;
+        renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
+          presentationFormat, presentationSize,
+          compBuffManager, mesh, gridTexture, sampler);
+        bufManagerExists = true;
+      } else {
       var modelData = meshDictionary[modelParams.model];
-      loadModel(modelData.filename).then((mesh : Mesh) => {
+      loadModel(modelData.filename, device).then((mesh : Mesh) => {
         mesh.scale = modelData.scale;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,
-          compBuffManager, mesh);
+          compBuffManager, mesh, gridTexture, sampler);
     
         bufManagerExists = true;
       });
+    }
     }
 
     camera.update();
@@ -334,26 +384,31 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             resetCameraFunc(5,10,5);
             compBuffManager.numValidAgents = 1<<6;
             simulationParams.numObstacles = 0;
+            guiParams.resetCamera = () => resetCameraFunc(5, 10, 5);
             break;
           case TestScene.BOTTLENECK:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 2;
+            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.DENSE:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<15;
             simulationParams.numObstacles = 0;
+            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.SPARSE:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<12;
             simulationParams.numObstacles = 0;
+            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.OBSTACLES:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 5;
+            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.CIRCLE:
             resetCameraFunc(5,20,5);
@@ -391,6 +446,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       var computeCommand = device.createCommandEncoder();
       var computeBindGroup = computeBindGroup1;
 
+      if (simulationParams.simulate) {
       // write the parameters to the Uniform buffer for our compute shaders
       compBuffManager.writeSimParams(simulationParams);
 
@@ -423,7 +479,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       }
       passEncoder.endPass();
 
-      device.queue.submit([computeCommand.finish()])
+      device.queue.submit([computeCommand.finish()]);
+    
       
       // Stability/Contact solve will write to different buffer
       computeBindGroup = computeBindGroup2;
@@ -461,6 +518,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       device.queue.submit([computeCommand.finish()])
     }
+    }
 
     // ------------------ Render Calls ------------------------- //
     if (bufManagerExists) {
@@ -470,11 +528,11 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       renderBuffManager.renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
-
+      
       const passEncoder = renderCommand.beginRenderPass(renderBuffManager.renderPassDescriptor);
 
       // ----------------------- Draw ------------------------- //
-      renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder);
+      renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder, guiParams.gridOn);
       //if (guiParams.gridOn)
       //  renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder);
 
