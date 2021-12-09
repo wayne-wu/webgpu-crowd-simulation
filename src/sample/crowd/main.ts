@@ -100,9 +100,6 @@ function fillSortPipelineList(device,
 
 const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
-  canvasRef.current.width = document.body.clientWidth - 50;
-  canvasRef.current.height = canvasRef.current.width * (800 / 1600);
-
   ///////////////////////////////////////////////////////////////////////
   //                       Camera Setup                                //
   ///////////////////////////////////////////////////////////////////////
@@ -167,7 +164,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     model: 'Duck'
   }
   let prevModel = 'Duck';
-  gui.add(modelParams, 'model', ['Archer', 'Cube', 'Duck', 'Cesium Man']);
+  gui.add(modelParams, 'model', Array.from(Object.keys(meshDictionary)));
 
 
   /////////////////////////////////////////////////////////////////////////
@@ -244,7 +241,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   }
   else{
     var modelData = meshDictionary[modelParams.model];
-    loadModel(modelData.filename).then((mesh : Mesh) => {
+    loadModel(modelData.filename, device).then((mesh : Mesh) => {
       mesh.scale = modelData.scale;
       renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
         presentationFormat, presentationSize,
@@ -339,9 +336,6 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     // Sample is no longer the active page.
     if (!canvasRef.current) return;
 
-    canvasRef.current.width = document.body.clientWidth - 50;
-    canvasRef.current.height = canvasRef.current.width * (800 / 1600);
-
     // Compute new grid lines if there's a change in the gui
     if (prevGridWidth != guiParams.gridWidth) {
       renderBuffManager.resetGridLinesBuffer(guiParams.gridWidth);
@@ -362,7 +356,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         bufManagerExists = true;
       } else {
       var modelData = meshDictionary[modelParams.model];
-      loadModel(modelData.filename).then((mesh : Mesh) => {
+      loadModel(modelData.filename, device).then((mesh : Mesh) => {
         mesh.scale = modelData.scale;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,

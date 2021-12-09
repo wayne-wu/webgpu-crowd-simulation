@@ -51,8 +51,8 @@
 
 [[stage(fragment)]]
 fn fs_platform([[location(0)]] fragUV: vec2<f32>,
-        [[location(1)]] fragPosition: vec4<f32>,
-        [[location(2)]] fragNor : vec4<f32>) -> [[location(0)]] vec4<f32> {
+               [[location(1)]] fragPosition: vec4<f32>,
+               [[location(2)]] fragNor : vec4<f32>) -> [[location(0)]] vec4<f32> {
   var lightDir = vec4<f32>(1.0, 1.0, 1.0, 0.0);
   var lambertTerm = dot(normalize(lightDir), normalize(fragNor));
 
@@ -62,7 +62,7 @@ fn fs_platform([[location(0)]] fragUV: vec2<f32>,
   var albedo = vec4<f32>(1.0, 1.0, 1.0, 1.0);
   
   if (uniforms.gridOn == 1.0){
-    albedo = textureSample(myTexture, mySampler, fragUV) + 0.9;
+    albedo = textureSample(myTexture, mySampler, fragUV) + 0.95;
   }
   return albedo;
 }

@@ -161,8 +161,6 @@ const SampleLayout: React.FunctionComponent<
           console.error(err);
           setError(err);
         });
-        canvasWidth = canvasRef.current.clientWidth;
-        canvasHeight = canvasRef.current.height;
       }
     } catch (err) {
       console.error(err);

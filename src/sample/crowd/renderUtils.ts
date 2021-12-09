@@ -76,12 +76,7 @@ export class RenderBufferManager {
   }
 
   initBuffers(gridWidth: number) {
-    // Create vertex buffers for the platform and the grid lines
     this.platformVertexBuffer = getVerticesBuffer(this.device, platformVertexArray);
-
-    // Compute the grid lines based on an input gridWidth
-    //let gridLinesVertexArray = getGridLines(gridWidth);
-    //this.gridLinesVertexBuffer = getVerticesBuffer(this.device, gridLinesVertexArray);
 
     this.prototypeVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
     this.obstacleVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
@@ -96,15 +91,10 @@ export class RenderBufferManager {
       platformPositionOffset, platformUVOffset, platformNorOffset, presentationFormat, 'triangle-list', 'back'
     );
 
-    // this.gridLinesPipeline = getPipeline(
-    //   this.device, renderWGSL, 'vs_main', 'fs_gridLines', gridLinesVertexSize,
-    //   gridLinesPositionOffset, gridLinesUVOffset, presentationFormat, 'line-list', 'none'
-    // );
-
     this.crowdPipeline = getCrowdRenderPipeline(
       this.device, crowdWGSL, cbm.agentInstanceSize, cbm.agentPositionOffset, 
       cbm.agentColorOffset, cbm.agentVelocityOffset, this.mesh.normalOffset, this.mesh.itemSize, this.mesh.posOffset, 
-      this.mesh.uvOffset, presentationFormat);
+      this.mesh.uvOffset, this.mesh.colorOffset, presentationFormat);
 
     this.obstaclesPipeline = getObstaclesRenderPipeline(
       this.device, obstaclesWGSL, cbm.obstacleInstanceSize, 0, 
@@ -116,12 +106,10 @@ export class RenderBufferManager {
     // Seems very efficient to have to redeclare pretty much the same data multiple times
     let mvpSize = 4 * 16;  // mat4
     this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4);
-    //this.gridLinesUniformBuffer = getUniformBuffer(this.device, mvpSize);
     this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize + 3*4 + 1*4);
     this.obstaclesUniformBuffer = getUniformBuffer(this.device, mvpSize);
 
-    this.platformBindGroup = getPlatformUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer, gridTexture, sampler);
-    //this.gridLinesBindGroup = getUniformBindGroup(this.device, this.gridLinesPipeline, this.gridLinesUniformBuffer);
+    this.platformBindGroup = getTexturedUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer, gridTexture, sampler);
     this.crowdBindGroup = getUniformBindGroup(this.device, this.crowdPipeline, this.crowdUniformBuffer);
     this.obstaclesBindGroup = getUniformBindGroup(this.device, this.obstaclesPipeline, this.obstaclesUniformBuffer);
   }
@@ -320,7 +308,7 @@ const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryP
 }
 
 const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, velOffset: number, vertNorOffset: number,
-                                       vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, presentationFormat) => {
+                                       vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, vertColorOffset: number, presentationFormat) => {
   let buffers = [
     {
       // instanced agents buffer
@@ -368,6 +356,12 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
           offset: vertNorOffset,
           format: 'float32x4'
         },
+        {
+          // mesh color
+          shaderLocation: 6,
+          offset: vertColorOffset,
+          format: 'float32x3'
+        }
         ],
     },   
   ];
@@ -469,7 +463,7 @@ const getUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uni
   return uniformBindGroup;
 }
 
-const getPlatformUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uniformBuffer: GPUBuffer, textureBuffer: GPUTexture, sampler) => {
+const getTexturedUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uniformBuffer: GPUBuffer, textureBuffer: GPUTexture, sampler) => {
   const uniformBindGroup = device.createBindGroup({
   layout: pipeline.getBindGroupLayout(0),
   entries: [
