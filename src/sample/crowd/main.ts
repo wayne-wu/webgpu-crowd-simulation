@@ -99,12 +99,16 @@ function fillSortPipelineList(device,
 
 const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
+  canvasRef.current.width = document.body.clientWidth - 50;
+  canvasRef.current.height = canvasRef.current.width * (800 / 1600);
+
   ///////////////////////////////////////////////////////////////////////
   //                       Camera Setup                                //
   ///////////////////////////////////////////////////////////////////////
 
   camera = new Camera(vec3.fromValues(50, 50, 50), vec3.fromValues(0, 0, 0));
   aspect = canvasRef.current.width / canvasRef.current.height;
+  //console.log(document.body.clientWidth);
   camera.setAspectRatio(aspect);
   camera.updateProjectionMatrix();
 
@@ -325,6 +329,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     // Sample is no longer the active page.
     if (!canvasRef.current) return;
 
+    canvasRef.current.width = document.body.clientWidth - 50;
+    canvasRef.current.height = canvasRef.current.width * (800 / 1600);
+
     // Compute new grid lines if there's a change in the gui
     if (prevGridWidth != guiParams.gridWidth) {
       renderBuffManager.resetGridLinesBuffer(guiParams.gridWidth);
@@ -489,7 +496,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       const passEncoder = renderCommand.beginRenderPass(renderBuffManager.renderPassDescriptor);
 
       // ----------------------- Draw ------------------------- //
-      renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder);
+      renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder, guiParams.gridOn);
       //if (guiParams.gridOn)
       //  renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder);
 

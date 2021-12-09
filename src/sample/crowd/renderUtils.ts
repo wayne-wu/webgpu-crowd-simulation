@@ -64,7 +64,8 @@ export class RenderBufferManager {
 
   mesh                    : Mesh;
 
-  constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, mesh : Mesh, gridTexture: GPUTexture, sampler) 
+  constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, 
+               mesh : Mesh, gridTexture: GPUTexture, sampler) 
   {
     this.device = device;
     this.mesh = mesh;
@@ -114,7 +115,7 @@ export class RenderBufferManager {
     // NOTE: Is there really no way to share the same uniform buffer across different pipelines?
     // Seems very efficient to have to redeclare pretty much the same data multiple times
     let mvpSize = 4 * 16;  // mat4
-    this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize);
+    this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4);
     //this.gridLinesUniformBuffer = getUniformBuffer(this.device, mvpSize);
     this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize + 3*4 + 1*4);
     this.obstaclesUniformBuffer = getUniformBuffer(this.device, mvpSize);
@@ -155,13 +156,19 @@ export class RenderBufferManager {
     this.gridLinesVertexBuffer = getVerticesBuffer(this.device, gridLinesVertexArray);
   }
 
-  drawPlatform(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder) {
+  drawPlatform(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder, gridOn: boolean) {
+    const gridOnArray = new Float32Array([gridOn ? 1.0 : 0.0]);
     device.queue.writeBuffer(
       this.platformUniformBuffer,
       0,
       transformationMatrix.buffer,
       transformationMatrix.byteOffset,
       transformationMatrix.byteLength
+    );
+    device.queue.writeBuffer(
+      this.platformUniformBuffer,
+      transformationMatrix.byteLength,
+      gridOnArray
     );
     passEncoder.setPipeline(this.platformPipeline);
     passEncoder.setBindGroup(0, this.platformBindGroup);

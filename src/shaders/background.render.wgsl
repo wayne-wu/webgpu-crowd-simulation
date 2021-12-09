@@ -4,8 +4,9 @@
 
 [[block]] struct Uniforms {
     modelViewProjectionMatrix : mat4x4<f32>;
+    gridOn : f32;
   };
-  [[binding(0), group(0)]] var<uniform> uniforms : Uniforms;
+[[binding(0), group(0)]] var<uniform> uniforms : Uniforms;
 
 [[block]] struct Neighbors {
   neighbors : array<u32>;
@@ -58,6 +59,10 @@ fn fs_platform([[location(0)]] fragUV: vec2<f32>,
   if (fragUV.x == -1.0){
     return vec4<f32>(0.9, 0.9, 0.9, 1.0);
   }
-  var albedo = textureSample(myTexture, mySampler, fragUV) + 0.9;
+  var albedo = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  
+  if (uniforms.gridOn == 1.0){
+    albedo = textureSample(myTexture, mySampler, fragUV) + 0.9;
+  }
   return albedo;
 }
