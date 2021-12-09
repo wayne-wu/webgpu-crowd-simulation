@@ -17,6 +17,7 @@ import headerWGSL from '../../shaders/header.compute.wgsl';
 
 import {loadModel, Mesh} from "../../meshes/mesh";
 import { meshDictionary } from './meshDictionary';
+import { cubeVertexArray, cubeVertexCount } from '../../meshes/cube';
 
 let camera : Camera;
 let aspect : number;
@@ -166,7 +167,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     model: 'Duck'
   }
   let prevModel = 'Duck';
-  gui.add(modelParams, 'model', ['Archer', 'Duck', 'Cesium Man']);
+  gui.add(modelParams, 'model', ['Archer', 'Cube', 'Duck', 'Cesium Man']);
 
 
   /////////////////////////////////////////////////////////////////////////
@@ -226,23 +227,32 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       [imageBitmap.width, imageBitmap.height]
     );
   }
-
-  var bufManagerExists = false;
-  var modelData = meshDictionary[modelParams.model];
-  loadModel(modelData.filename).then((mesh : Mesh) => {
-    mesh.scale = modelData.scale;
-    renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
-      presentationFormat, presentationSize,
-      compBuffManager, mesh, gridTexture, sampler);
-    
-    bufManagerExists = true;
-  });
-
   // Create a sampler with linear filtering for smooth interpolation.
   const sampler = device.createSampler({
     magFilter: 'linear',
     minFilter: 'linear',
   });
+
+  var bufManagerExists = false;
+  if (modelParams.model == 'Cube'){
+    let mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
+    mesh.scale = 0.2;
+    renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
+      presentationFormat, presentationSize,
+      compBuffManager, mesh, gridTexture, sampler);
+    bufManagerExists = true;
+  }
+  else{
+    var modelData = meshDictionary[modelParams.model];
+    loadModel(modelData.filename).then((mesh : Mesh) => {
+      mesh.scale = modelData.scale;
+      renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
+        presentationFormat, presentationSize,
+        compBuffManager, mesh, gridTexture, sampler);
+      
+      bufManagerExists = true;
+    });
+  }
 
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
@@ -343,6 +353,14 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     if (prevModel != modelParams.model) {
       bufManagerExists = false;
       prevModel = modelParams.model;
+      if (modelParams.model == 'Cube'){
+        let mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
+        mesh.scale = 0.2;
+        renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
+          presentationFormat, presentationSize,
+          compBuffManager, mesh, gridTexture, sampler);
+        bufManagerExists = true;
+      } else {
       var modelData = meshDictionary[modelParams.model];
       loadModel(modelData.filename).then((mesh : Mesh) => {
         mesh.scale = modelData.scale;
@@ -352,6 +370,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     
         bufManagerExists = true;
       });
+    }
     }
 
     camera.update();
