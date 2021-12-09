@@ -3,21 +3,23 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 [[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
-[[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
-[[binding(2), group(0)]] var<storage, read> grid : Grid;
+[[binding(1), group(0)]] var<storage, read> agentData_r : Agents;
+[[binding(2), group(0)]] var<storage, write> agentData_w : Agents;
+[[binding(3), group(0)]] var<storage, read> grid : Grid;
+//[[binding(4), group(0)]] var<storage, read> obstacleData : Obstacles;
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
 
-  var agent = agentData.agents[idx];
+  var agent = agentData_r.agents[idx];
   var totalDx = vec3<f32>(0.0, 0.0, 0.0);
   var neighborCount = 0;
 
   if (agent.cell < 0){
     // ignore invalid cells
     agent.c = vec4<f32>(1.0, 0.0, 0.0, 1.0);
-    agentData.agents[idx] = agent;
+    agentData_w.agents[idx] = agent;
     return;
   }
 
@@ -45,7 +47,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
         continue; 
       }
 
-      let agent_j = agentData.agents[i];
+      let agent_j = agentData_r.agents[i];
 
       var n = agent.xp - agent_j.xp;
       let d = length(n);
@@ -95,5 +97,5 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   }
 
   // Store the new agent value
-  agentData.agents[idx] = agent;
+  agentData_w.agents[idx] = agent;
 }

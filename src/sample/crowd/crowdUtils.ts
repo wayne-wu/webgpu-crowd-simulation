@@ -42,7 +42,8 @@ export class ComputeBufferManager {
 
   // buffers
   simulationUBOBuffer : GPUBuffer;
-  agentsBuffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
+  agents1Buffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
+  agents2Buffer : GPUBuffer;
   cellsBuffer : GPUBuffer;            // start / end indices for each cell (in pairs)
   
   obstaclesBuffer : GPUBuffer;
@@ -147,13 +148,19 @@ export class ComputeBufferManager {
     });
 
     // agent buffer
-    this.agentsBuffer = this.device.createBuffer({
+    this.agents1Buffer = this.device.createBuffer({
       size: this.numAgents * this.agentInstanceSize,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
       mappedAtCreation: true
     });
-    new Float32Array(this.agentsBuffer.getMappedRange()).set(agentData);
-    this.agentsBuffer.unmap(); 
+    new Float32Array(this.agents1Buffer.getMappedRange()).set(agentData);
+    this.agents1Buffer.unmap(); 
+
+    this.agents2Buffer = this.device.createBuffer({
+      size: this.numAgents * this.agentInstanceSize,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+      mappedAtCreation: false
+    });
 
     // cells buffer
     this.cellsBuffer = this.device.createBuffer({
@@ -207,21 +214,28 @@ export class ComputeBufferManager {
         }
       },
       {
-        binding: 1, // agentsBuffer
+        binding: 1, // agents1Buffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
         }
       },
       {
-        binding: 2, // cellsBuffer
+        binding: 2, // agents2Buffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
         }
       },
       {
-        binding: 3, // obstacleBuffer
+        binding: 3, // cellsBuffer
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage"
+        }
+      },
+      {
+        binding: 4, // obstacleBuffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
@@ -231,7 +245,7 @@ export class ComputeBufferManager {
   });
   }
 
-  getBindGroup(){
+  getBindGroup(flip: boolean = false){
     var computeBindGroup = this.device.createBindGroup({
       layout: this.bindGroupLayout,
       entries: [
@@ -244,7 +258,7 @@ export class ComputeBufferManager {
         {
           binding: 1,
           resource: {
-            buffer: this.agentsBuffer,
+            buffer: flip ? this.agents2Buffer : this.agents1Buffer,  // READ
             offset: 0,
             size: this.numAgents * this.agentInstanceSize,
           },
@@ -252,13 +266,21 @@ export class ComputeBufferManager {
         {
           binding: 2,
           resource: {
+            buffer: flip ? this.agents1Buffer : this.agents2Buffer,  // WRITE
+            offset: 0,
+            size: this.numAgents * this.agentInstanceSize,
+          },
+        },
+        {
+          binding: 3,
+          resource: {
             buffer: this.cellsBuffer,
             offset: 0,
             size: this.gridWidth * this.gridWidth * this.cellInstanceSize,
           },
         },
         {
-          binding: 3,
+          binding: 4,
           resource: {
             buffer: this.obstaclesBuffer,
             offset: 0,
@@ -381,7 +403,7 @@ export class ComputeBufferManager {
   }
 
   initCircle(agents: Float32Array, obstacles: Float32Array) {
-    
+
     let radius = this.numAgents * diskRadius / Math.PI;
     
     for(let i = 0; i < this.numAgents; i++) {
