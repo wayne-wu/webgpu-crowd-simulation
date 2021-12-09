@@ -201,15 +201,43 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //////////////////////////////////////////////////////////////////////////
   var renderBuffManager : RenderBufferManager;
 
+  let gridTexture: GPUTexture;
+  {
+    const img = document.createElement('img');
+    img.src = require('../../../assets/img/checkerboard.png');
+    await img.decode();
+    const imageBitmap = await createImageBitmap(img);
+
+    gridTexture = device.createTexture({
+      size: [imageBitmap.width, imageBitmap.height, 1],
+      format: 'rgba8unorm',
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture(
+      { source: imageBitmap },
+      { texture: gridTexture },
+      [imageBitmap.width, imageBitmap.height]
+    );
+  }
+
   var bufManagerExists = false;
   var modelData = meshDictionary[modelParams.model];
   loadModel(modelData.filename).then((mesh : Mesh) => {
     mesh.scale = modelData.scale;
     renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
       presentationFormat, presentationSize,
-      compBuffManager, mesh);
+      compBuffManager, mesh, gridTexture, sampler);
     
     bufManagerExists = true;
+  });
+
+  // Create a sampler with linear filtering for smooth interpolation.
+  const sampler = device.createSampler({
+    magFilter: 'linear',
+    minFilter: 'linear',
   });
 
   //////////////////////////////////////////////////////////////////////////////
@@ -313,7 +341,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         mesh.scale = modelData.scale;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,
-          compBuffManager, mesh);
+          compBuffManager, mesh, gridTexture, sampler);
     
         bufManagerExists = true;
       });
@@ -457,7 +485,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       renderBuffManager.renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
-
+      
       const passEncoder = renderCommand.beginRenderPass(renderBuffManager.renderPassDescriptor);
 
       // ----------------------- Draw ------------------------- //

@@ -64,13 +64,13 @@ export class RenderBufferManager {
 
   mesh                    : Mesh;
 
-  constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, mesh : Mesh) 
+  constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, mesh : Mesh, gridTexture: GPUTexture, sampler) 
   {
     this.device = device;
     this.mesh = mesh;
     this.initBuffers(gridWidth);
     this.buildPipelines(presentationFormat, cbm);
-    this.setBindGroups();
+    this.setBindGroups(gridTexture, sampler);
     this.setRenderPassDescriptor(presentationSize);
   }
 
@@ -110,7 +110,7 @@ export class RenderBufferManager {
       cubeVertexSize, cubePositionOffset, cubeUVOffset, cubeNorOffset, presentationFormat);
   }
 
-  setBindGroups() {
+  setBindGroups(gridTexture: GPUTexture, sampler: GPUSampler) {
     // NOTE: Is there really no way to share the same uniform buffer across different pipelines?
     // Seems very efficient to have to redeclare pretty much the same data multiple times
     let mvpSize = 4 * 16;  // mat4
@@ -119,7 +119,7 @@ export class RenderBufferManager {
     this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize + 3*4 + 1*4);
     this.obstaclesUniformBuffer = getUniformBuffer(this.device, mvpSize);
 
-    this.platformBindGroup = getUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer);
+    this.platformBindGroup = getPlatformUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer, gridTexture, sampler);
     //this.gridLinesBindGroup = getUniformBindGroup(this.device, this.gridLinesPipeline, this.gridLinesUniformBuffer);
     this.crowdBindGroup = getUniformBindGroup(this.device, this.crowdPipeline, this.crowdUniformBuffer);
     this.obstaclesBindGroup = getUniformBindGroup(this.device, this.obstaclesPipeline, this.obstaclesUniformBuffer);
@@ -457,6 +457,29 @@ const getUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uni
         buffer: uniformBuffer,
       },
     },
+  ],
+  });
+  return uniformBindGroup;
+}
+
+const getPlatformUniformBindGroup = (device: GPUDevice, pipeline: GPURenderPipeline, uniformBuffer: GPUBuffer, textureBuffer: GPUTexture, sampler) => {
+  const uniformBindGroup = device.createBindGroup({
+  layout: pipeline.getBindGroupLayout(0),
+  entries: [
+    {
+      binding: 0,
+      resource: {
+        buffer: uniformBuffer,
+      },
+    },
+    {
+      binding: 1,
+      resource: sampler
+    },
+    {
+      binding: 2,
+      resource: textureBuffer.createView()
+    }
   ],
   });
   return uniformBindGroup;
