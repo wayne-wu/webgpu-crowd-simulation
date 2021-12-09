@@ -374,26 +374,31 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             resetCameraFunc(5,10,5);
             compBuffManager.numValidAgents = 1<<6;
             simulationParams.numObstacles = 0;
+            guiParams.resetCamera = () => resetCameraFunc(5, 10, 5);
             break;
           case TestScene.BOTTLENECK:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 2;
+            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.DENSE:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<15;
             simulationParams.numObstacles = 0;
+            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.SPARSE:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<12;
             simulationParams.numObstacles = 0;
+            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.OBSTACLES:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 5;
+            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
         }
         resetSim = true;
@@ -422,6 +427,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       var computeCommand = device.createCommandEncoder();
 
+      if (simulationParams.simulate) {
       // write the parameters to the Uniform buffer for our compute shaders
       compBuffManager.writeSimParams(simulationParams);
 
@@ -454,7 +460,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       }
       passEncoder.endPass();
 
-      device.queue.submit([computeCommand.finish()])
+      device.queue.submit([computeCommand.finish()]);
+    
       
       // ----- Compute Pass Constraint Solve -----
       // Since WebGPU does not support push constants, need to add write buffer to queue
@@ -482,6 +489,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       passEncoder.endPass();
 
       device.queue.submit([computeCommand.finish()])
+    }
     }
 
     // ------------------ Render Calls ------------------------- //
