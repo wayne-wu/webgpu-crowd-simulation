@@ -14,6 +14,7 @@ export enum TestScene {
   DENSE = "dense",
   SPARSE = "sparse",
   OBSTACLES = "obstacles",
+  CIRCLE = "circle",
 }
 
 
@@ -41,7 +42,8 @@ export class ComputeBufferManager {
 
   // buffers
   simulationUBOBuffer : GPUBuffer;
-  agentsBuffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
+  agents1Buffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
+  agents2Buffer : GPUBuffer;
   cellsBuffer : GPUBuffer;            // start / end indices for each cell (in pairs)
   
   obstaclesBuffer : GPUBuffer;
@@ -60,7 +62,7 @@ export class ComputeBufferManager {
 
     this.agentPositionOffset = 0;
     this.agentColorOffset = 4 * 4;
-    this.agentVelocityOffset = 8 * 4;
+    this.agentVelocityOffset = 20 * 4;
 
     this.numAgents = Math.pow(2, Math.ceil(Math.log2(numAgents)));
     this.numValidAgents = numAgents;
@@ -79,6 +81,8 @@ export class ComputeBufferManager {
       1 * 4 + // preferred speed
       3 * 4 + // goal
       1 * 4 + // cell
+      3 * 4 + // dir
+      1 * 4 + // group
       0;
 
     this.obstacleInstanceSize =
@@ -132,6 +136,9 @@ export class ComputeBufferManager {
       case TestScene.OBSTACLES:
         this.initObstacles(agentData,obstacleData);
         break;
+      case TestScene.CIRCLE:
+        this.initCircle(agentData, obstacleData);
+        break;
     }
 
     // simulation parameter buffer
@@ -141,13 +148,19 @@ export class ComputeBufferManager {
     });
 
     // agent buffer
-    this.agentsBuffer = this.device.createBuffer({
+    this.agents1Buffer = this.device.createBuffer({
       size: this.numAgents * this.agentInstanceSize,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
       mappedAtCreation: true
     });
-    new Float32Array(this.agentsBuffer.getMappedRange()).set(agentData);
-    this.agentsBuffer.unmap(); 
+    new Float32Array(this.agents1Buffer.getMappedRange()).set(agentData);
+    this.agents1Buffer.unmap(); 
+
+    this.agents2Buffer = this.device.createBuffer({
+      size: this.numAgents * this.agentInstanceSize,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+      mappedAtCreation: false
+    });
 
     // cells buffer
     this.cellsBuffer = this.device.createBuffer({
@@ -201,21 +214,28 @@ export class ComputeBufferManager {
         }
       },
       {
-        binding: 1, // agentsBuffer
+        binding: 1, // agents1Buffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
         }
       },
       {
-        binding: 2, // cellsBuffer
+        binding: 2, // agents2Buffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
         }
       },
       {
-        binding: 3, // obstacleBuffer
+        binding: 3, // cellsBuffer
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage"
+        }
+      },
+      {
+        binding: 4, // obstacleBuffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage"
@@ -225,7 +245,7 @@ export class ComputeBufferManager {
   });
   }
 
-  getBindGroup(){
+  getBindGroup(flip: boolean = false){
     var computeBindGroup = this.device.createBindGroup({
       layout: this.bindGroupLayout,
       entries: [
@@ -238,7 +258,7 @@ export class ComputeBufferManager {
         {
           binding: 1,
           resource: {
-            buffer: this.agentsBuffer,
+            buffer: flip ? this.agents2Buffer : this.agents1Buffer,  // READ
             offset: 0,
             size: this.numAgents * this.agentInstanceSize,
           },
@@ -246,13 +266,21 @@ export class ComputeBufferManager {
         {
           binding: 2,
           resource: {
+            buffer: flip ? this.agents1Buffer : this.agents2Buffer,  // WRITE
+            offset: 0,
+            size: this.numAgents * this.agentInstanceSize,
+          },
+        },
+        {
+          binding: 3,
+          resource: {
             buffer: this.cellsBuffer,
             offset: 0,
             size: this.gridWidth * this.gridWidth * this.cellInstanceSize,
           },
         },
         {
-          binding: 3,
+          binding: 4,
           resource: {
             buffer: this.obstaclesBuffer,
             offset: 0,
@@ -305,10 +333,14 @@ export class ComputeBufferManager {
     agents[offset + 16] = goal[0];
     agents[offset + 17] = minY;
     agents[offset + 18] = goal[1];
+
+    agents[offset + 20] = goal[0] - position[0];
+    agents[offset + 21] = 0;
+    agents[offset + 22] = goal[1] - position[1];
   }
 
   initProximal(agents : Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length/2; ++i) {
+    for (let i = 0; i < this.numAgents/2; ++i) {
       let x = Math.floor(i/10);
       let z = i%10 + 5;
       let v = 0.5;
@@ -318,7 +350,7 @@ export class ComputeBufferManager {
   }
 
   initBottleneck(agents : Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length; ++i) {
+    for (let i = 0; i < this.numAgents; ++i) {
       let x = i%20 - 10;
       let z = Math.floor(i/20) + 10;
       let v = 0.5;
@@ -332,7 +364,7 @@ export class ComputeBufferManager {
   }
 
   initDense(agents : Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length/2; ++i) {
+    for (let i = 0; i < this.numAgents/2; ++i) {
       let x = i%100 - 50;
       let z = Math.floor(i/100) + 10;
       let v = 0.5;
@@ -342,7 +374,7 @@ export class ComputeBufferManager {
   }
 
   initSparse(agents: Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length/2; ++i) {
+    for (let i = 0; i < this.numAgents/2; ++i) {
       let x = 2*(i%100) - 50;
       let z = 2*Math.floor(i/100) + 10;
       let v = 0.5;
@@ -353,7 +385,7 @@ export class ComputeBufferManager {
   }
 
   initObstacles(agents: Float32Array, obstacles: Float32Array) {
-    for (let i = 0; i < agents.length/2; ++i) {
+    for (let i = 0; i < this.numAgents/2; ++i) {
       let x = i%100 - 50;
       let z = Math.floor(i/100) + 10;
       let v = 0.5;
@@ -367,6 +399,20 @@ export class ComputeBufferManager {
       let scale = Math.random() * 3 + 1;
       let rot = Math.random() * Math.PI;
       this.setObstacleData(obstacles, i, [(Math.random()-0.5)*scatterWidth,0], rot, [scale, scale]);
+    }
+  }
+
+  initCircle(agents: Float32Array, obstacles: Float32Array) {
+
+    let radius = this.numAgents * diskRadius / Math.PI;
+    
+    for(let i = 0; i < this.numAgents; i++) {
+      let t = (i/this.numAgents) * 2.0 * Math.PI;
+      let x = radius * Math.cos(t);
+      let z = radius * Math.sin(t);
+      let c = [Math.random(), Math.random(), Math.random(), 1];
+      let s = (Math.random() - 0.5) + preferredVelocity;
+      this.setAgentData(agents, i, [x, z], c, [0, 0], s, [-x,-z]);
     }
   }
 
