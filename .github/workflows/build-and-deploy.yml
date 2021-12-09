@@ -7,7 +7,7 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      BASE_PATH: /webgpu-samples
+      BASE_PATH: /
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v2.3.1

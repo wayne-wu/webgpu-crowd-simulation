@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 
 import './styles.css';
 import styles from './MainLayout.module.css';
+import Crowd from './samples/crowd';
 
 const title = 'WebGPU Samples';
 
@@ -12,32 +13,6 @@ const MainLayout: React.FunctionComponent<AppProps> = ({
   Component,
   pageProps,
 }) => {
-  const router = useRouter();
-  const samplesNames = [
-    'helloTriangle',
-    'helloTriangleMSAA',
-    'resizeCanvas',
-    'rotatingCube',
-    'twoCubes',
-    'texturedCube',
-    'instancedCube',
-    'fractalCube',
-    'computeBoids',
-    'animometer',
-    'videoUploading',
-    'imageBlur',
-    'shadowMapping',
-    'reversedZ',
-    'deferredRendering',
-    'particles',
-  ];
-
-  const oldPathSyntaxMatch = router.asPath.match(/(\?wgsl=[01])#(\S+)/);
-  if (oldPathSyntaxMatch) {
-    const slug = oldPathSyntaxMatch[2];
-    router.replace(`/samples/${slug}`);
-    return <></>;
-  }
 
   return (
     <>
@@ -69,6 +44,7 @@ const MainLayout: React.FunctionComponent<AppProps> = ({
         />
       </Head>
       <div className={styles.wrapper}>
+        {Crowd}
         {/* <nav className={`${styles.panel} ${styles.container}`}>
           <h1>
             <Link href="/">{title}</Link>
