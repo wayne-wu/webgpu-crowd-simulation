@@ -21,23 +21,18 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let gridHeight = sim_params.gridWidth;
   let cellWidth = 1000.0 / gridWidth;
 
-  // get position relative to the start of the grid
-  // (world origin is at the center of the grid)
-  let pos = vec3<f32>(agent.x.x + (cellWidth * gridWidth / 2.0), 
-                      agent.x.y, 
-                      agent.x.z + (cellWidth * gridHeight / 2.0));
-  
-  var cell = vec2<i32>(i32(pos.x / cellWidth), i32(pos.z / cellWidth));
+  let posCellSpace = worldSpacePosToCellSpace(agent.x.x, 
+                                              agent.x.z, 
+                                              gridWidth, 
+                                              cellWidth);
 
-  var cellID : i32;
+  let cellXY = cellSpaceToCell2d(posCellSpace.x, posCellSpace.y, cellWidth);
 
-  // if outside grid, note that it's in an invalid cell
-  if (cell.x >= i32(gridWidth) || cell.y >= i32(gridHeight) ||
-      pos.x < 0.0 || pos.z < 0.0) {
+  var cellID = cell2dto1d(cellXY.x, cellXY.y, gridWidth);
+
+  if (cellXY.x >= i32(gridWidth) || cellXY.y >= i32(gridHeight) ||
+      posCellSpace.x < 0.0 || posCellSpace.y < 0.0) {
     cellID = -1; 
-  }
-  else {
-    cellID = cell.x + i32(gridWidth) * cell.y;
   }
 
   agent.cell = cellID;

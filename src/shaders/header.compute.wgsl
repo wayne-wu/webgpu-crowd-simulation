@@ -118,3 +118,60 @@ fn obstacle_constraint(agent: Agent, obstacle: Obstacle, count: ptr<function, i3
   wall_constraint(agent, p3, p4, count, total_dx);
   wall_constraint(agent, p4, p1, count, total_dx);
 }
+
+
+// --- Neighbor finding helper functions ---
+
+fn cell2dto1d(x: i32, y: i32, gridWidth: f32) -> i32 {
+  return x + (y * i32(gridWidth));
+}
+
+fn cell1dto2d(i: i32, gridWidth: f32) -> vec2<i32> {
+  let x = i % i32(gridWidth);
+  let y = i / i32(gridWidth);
+
+  return vec2<i32>(x, y);
+}
+
+fn worldSpacePosToCellSpace(x: f32, 
+                            z: f32, 
+                            gridWidth: f32, 
+                            cellWidth: f32) -> vec2<f32> {
+  let pos = vec2<f32>(x + (cellWidth * gridWidth / 2.0), 
+                      z + (cellWidth * gridWidth / 2.0));
+  
+  return pos;
+}
+
+fn cellSpaceToCell2d(x: f32, y: f32, cellWidth: f32) -> vec2<i32>{
+  return vec2<i32>(i32(x / cellWidth), i32(y / cellWidth));
+}
+
+
+fn worldSpacePosToCell2d(x: f32, z: f32, gridWidth: f32, cellWidth: f32) -> vec2<i32> {
+  let pos = worldSpacePosToCellSpace(x, z, gridWidth, cellWidth); 
+  
+  return cellSpaceToCell2d(x, z, cellWidth);
+}
+
+fn getBBoxCornerCells(worldX: f32, 
+                      worldY: f32, 
+                      gridWidth: f32, 
+                      cellWidth: f32,
+                      radius: f32) -> vec4<i32>{
+
+  let upperLeft = worldSpacePosToCell2d(worldX + radius, 
+                                 worldY + radius, 
+                                 gridWidth, 
+                                 cellWidth);
+
+  let backRight = worldSpacePosToCell2d(worldX - radius, 
+                                 worldY - radius, 
+                                 gridWidth, 
+                                 cellWidth);
+
+  return vec4<i32>(backRight.x,
+                   backRight.y,
+                   upperLeft.x,
+                   upperLeft.y); 
+}
