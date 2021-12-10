@@ -1,4 +1,4 @@
-import { mat4, vec3 } from "gl-matrix";
+import { mat4, vec3, vec2 } from "gl-matrix";
 
 const scatterWidth = 45;
 const diskRadius = 0.5;
@@ -26,6 +26,7 @@ export class ComputeBufferManager {
   numAgents : number;
   numValidAgents : number; 
   numObstacles : number;
+  numGoals    : number;
 
   // buffer sizes
   simulationUBOBufferSize : number;
@@ -47,6 +48,9 @@ export class ComputeBufferManager {
   agents1Buffer : GPUBuffer;           // data on each agent, including position, velocity, etc.
   agents2Buffer : GPUBuffer;
   cellsBuffer : GPUBuffer;            // start / end indices for each cell (in pairs)
+  goalsBuffer : GPUBuffer;
+
+  goalData : Array<vec2>;             // goal positions for rendering
   
   obstaclesBuffer : GPUBuffer;
 
@@ -61,6 +65,7 @@ export class ComputeBufferManager {
               gridWidth: number){
     this.device = device;
     this.testScene = testScene;
+    this.goalData = new Array<vec2>();
 
     this.agentPositionOffset = 0;
     this.agentColorOffset = 4 * 4;
@@ -70,6 +75,7 @@ export class ComputeBufferManager {
     this.numValidAgents = numAgents;
     
     this.numObstacles = 1;
+    this.numGoals = 0;
 
     // --- set buffer sizes ---
 
@@ -143,6 +149,8 @@ export class ComputeBufferManager {
         break;
     }
 
+    const goalsArray = this.getGoalsArray();
+
     // simulation parameter buffer
     this.simulationUBOBuffer = this.device.createBuffer({
       size: this.simulationUBOBufferSize,
@@ -179,6 +187,16 @@ export class ComputeBufferManager {
     });
     new Float32Array(this.obstaclesBuffer.getMappedRange()).set(obstacleData);
     this.obstaclesBuffer.unmap();
+
+    // goals buffer
+    this.goalsBuffer = this.device.createBuffer({
+      size: this.goalData.length * 6*4,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+      mappedAtCreation: true
+    });
+    new Float32Array(this.goalsBuffer.getMappedRange()).set(goalsArray);
+    this.goalsBuffer.unmap();
+
   }
 
   writeSimParams(simulationParams){
@@ -202,6 +220,20 @@ export class ComputeBufferManager {
         itr
       ])
     );
+  }
+
+  getGoalsArray(){
+    let tmpGoalVertArray = [];
+    for (let i = 0; i < this.goalData.length; i++){
+      tmpGoalVertArray[i * 6 + 0] = this.goalData[i][0];
+      tmpGoalVertArray[i * 6 + 1] = 1.0;
+      tmpGoalVertArray[i * 6 + 2] = this.goalData[i][1];
+      tmpGoalVertArray[i * 6 + 3] = 1.0;
+      tmpGoalVertArray[i * 6 + 4] = 1.0;  // filler data
+      tmpGoalVertArray[i * 6 + 5] = 1.0;  // filler data
+    }
+    this.numGoals = this.goalData.length;
+    return new Float32Array(tmpGoalVertArray);
   }
 
   setBindGroupLayout(){
@@ -342,16 +374,22 @@ export class ComputeBufferManager {
   }
 
   initProximal(agents : Float32Array, obstacles: Float32Array) {
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
       let x = Math.floor(i/10);
       let z = i%10 + 5;
       let v = 0.5;
+  
       this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -scatterWidth]);
       this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, scatterWidth]);
     }
+    tmpGoalData.push(vec2.fromValues(0, -scatterWidth));
+    tmpGoalData.push(vec2.fromValues(0, scatterWidth));
+    this.goalData = tmpGoalData;
   }
 
   initBottleneck(agents : Float32Array, obstacles: Float32Array) {
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents; ++i) {
       let x = i%20 - 10;
       let z = Math.floor(i/20) + 10;
@@ -361,21 +399,30 @@ export class ComputeBufferManager {
         [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -scatterWidth]);
     }
 
+    tmpGoalData.push(vec2.fromValues(0, -scatterWidth));
+    this.goalData = tmpGoalData;
+
     this.setObstacleData(obstacles, 0, [25,-25], 0, [20, 20]);
     this.setObstacleData(obstacles, 1, [-25,-25], 0, [20, 20]);
   }
 
   initDense(agents : Float32Array, obstacles: Float32Array) {
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
       let x = i%100 - 50;
       let z = Math.floor(i/100) + 10;
       let v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth]);
+      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -scatterWidth]);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, scatterWidth]);
     }
+
+    tmpGoalData.push(vec2.fromValues(0, -scatterWidth));
+    tmpGoalData.push(vec2.fromValues(0, scatterWidth));
+    this.goalData = tmpGoalData;
   }
 
   initSparse(agents: Float32Array, obstacles: Float32Array) {
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
       let x = 2*(i%100) - 50;
       let z = 2*Math.floor(i/100) + 10;
@@ -384,9 +431,14 @@ export class ComputeBufferManager {
       this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], s, [0, -scatterWidth]);
       this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], s, [0, scatterWidth]);
     }
+
+    tmpGoalData.push(vec2.fromValues(0, -scatterWidth));
+    tmpGoalData.push(vec2.fromValues(0, scatterWidth));
+    this.goalData = tmpGoalData;
   }
 
   initObstacles(agents: Float32Array, obstacles: Float32Array) {
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
       let x = i%100 - 50;
       let z = Math.floor(i/100) + 10;
@@ -402,12 +454,15 @@ export class ComputeBufferManager {
       let rot = Math.random() * Math.PI;
       this.setObstacleData(obstacles, i, [(Math.random()-0.5)*scatterWidth,0], rot, [scale, scale]);
     }
+
+    tmpGoalData.push(vec2.fromValues(0, -scatterWidth));
+    tmpGoalData.push(vec2.fromValues(0, scatterWidth));
+    this.goalData = tmpGoalData;
   }
 
   initCircle(agents: Float32Array, obstacles: Float32Array) {
-
+    const tmpGoalData = new Array<vec2>();
     let radius = this.numAgents * diskRadius / Math.PI;
-    
     for(let i = 0; i < this.numAgents; i++) {
       let t = (i/this.numAgents) * 2.0 * Math.PI;
       let x = radius * Math.cos(t);
@@ -415,7 +470,9 @@ export class ComputeBufferManager {
       let c = [Math.random(), Math.random(), Math.random(), 1];
       let s = (Math.random() - 0.5) + preferredVelocity;
       this.setAgentData(agents, i, [x, z], c, [0, 0], s, [-x,-z]);
+      tmpGoalData.push(vec2.fromValues(-x, -z));
     }
+    this.goalData = tmpGoalData;
   }
 
 }

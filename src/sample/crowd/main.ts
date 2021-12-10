@@ -136,6 +136,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     deltaTime: 0.02,
     numAgents: 1024,
     numObstacles : 1,
+    showGoals: true,
     avoidance: false,
     gridWidth: guiParams.gridWidth,
     testScene: TestScene.PROXIMAL,
@@ -149,6 +150,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
   simFolder.add(simulationParams, 'numAgents', 16, 40000, 2).listen();  // max 40,000 so that it's easier to change values
+  simFolder.add(simulationParams, 'showGoals');
   simFolder.add(simulationParams, 'avoidance');
   simFolder.add(simulationParams, 'testScene', Object.values(TestScene));
   simFolder.add(simulationParams, 'resetSimulation');
@@ -234,7 +236,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     mesh.scale = 0.2;
     renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
       presentationFormat, presentationSize,
-      compBuffManager, mesh, gridTexture, sampler);
+      compBuffManager, mesh, gridTexture, sampler, simulationParams.showGoals);
     bufManagerExists = true;
   }
   else{
@@ -243,7 +245,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       mesh.scale = modelData.scale;
       renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
         presentationFormat, presentationSize,
-        compBuffManager, mesh, gridTexture, sampler);
+        compBuffManager, mesh, gridTexture, sampler, simulationParams.showGoals);
       
       bufManagerExists = true;
     });
@@ -351,7 +353,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         mesh.scale = 0.2;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,
-          compBuffManager, mesh, gridTexture, sampler);
+          compBuffManager, mesh, gridTexture, sampler, simulationParams.showGoals);
         bufManagerExists = true;
       } else {
       var modelData = meshDictionary[modelParams.model];
@@ -359,7 +361,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         mesh.scale = modelData.scale;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,
-          compBuffManager, mesh, gridTexture, sampler);
+          compBuffManager, mesh, gridTexture, sampler, simulationParams.showGoals);
     
         bufManagerExists = true;
       });
@@ -558,6 +560,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       if (simulationParams.numObstacles > 0)
         renderBuffManager.drawObstacles(device, vp, passEncoder, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
+
+      if (compBuffManager.numGoals > 0 && simulationParams.showGoals){
+        renderBuffManager.drawGoals(device, vp, passEncoder, compBuffManager.goalsBuffer, compBuffManager.numGoals);
+      }
 
       passEncoder.endPass();
       device.queue.submit([renderCommand.finish()]);

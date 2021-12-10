@@ -23,51 +23,53 @@ import { ComputeBufferManager } from './crowdUtils';
 import { Mesh } from '../../meshes/mesh';
 
 import { vec3 } from 'gl-matrix';
+import { sphereItemSize, sphereNorOffset, spherePosOffset, sphereVertCount, sphereVertexArray } from '../../meshes/sphere';
 
 export class RenderBufferManager {
 
   device : GPUDevice;
 
   platformVertexBuffer    : GPUBuffer;
-  gridLinesVertexBuffer   : GPUBuffer;
   prototypeVertexBuffer   : GPUBuffer;
   obstacleVertexBuffer    : GPUBuffer;
   meshVertexBuffer        : GPUBuffer;
+  goalVertBuffer          : GPUBuffer;
 
   platformPipeline        : GPURenderPipeline;
-  gridLinesPipeline       : GPURenderPipeline;
   crowdPipeline           : GPURenderPipeline;
   obstaclesPipeline       : GPURenderPipeline;
+  goalPipeline            : GPURenderPipeline;
 
   commonUniformBuffer     : GPUBuffer;
   platformUniformBuffer   : GPUBuffer;
-  gridLinesUniformBuffer  : GPUBuffer;
   crowdUniformBuffer      : GPUBuffer;
   obstaclesUniformBuffer  : GPUBuffer;
+  goalUniformBuffer       : GPUBuffer;
 
   platformBindGroup       : GPUBindGroup;
-  gridLinesBindGroup      : GPUBindGroup;
   crowdBindGroup          : GPUBindGroup;
   obstaclesBindGroup      : GPUBindGroup;
+  goalBindGroup           : GPUBindGroup;
 
   renderPassDescriptor    : GPURenderPassDescriptor;
 
   mesh                    : Mesh;
 
   constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, 
-               mesh : Mesh, gridTexture: GPUTexture, sampler) 
+               mesh : Mesh, gridTexture: GPUTexture, sampler, showGoals: boolean) 
   {
     this.device = device;
     this.mesh = mesh;
-    this.initBuffers(gridWidth);
+    this.initBuffers(gridWidth, showGoals);
     this.buildPipelines(presentationFormat, cbm);
     this.setBindGroups(gridTexture, sampler);
     this.setRenderPassDescriptor(presentationSize);
   }
 
-  initBuffers(gridWidth: number) {
+  initBuffers(gridWidth: number, showGoals: boolean) {
     this.resizeGrid(gridWidth);
 
+    this.goalVertBuffer = getVerticesBuffer(this.device, new Float32Array(sphereVertexArray));
     this.platformVertexBuffer = getVerticesBuffer(this.device, platformVertexArray);
 
     this.prototypeVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
@@ -82,6 +84,16 @@ export class RenderBufferManager {
       this.device, renderWGSL, 'vs_main', 'fs_platform', platformVertexSize,
       platformPositionOffset, platformUVOffset, platformNorOffset, presentationFormat, 'triangle-list', 'back'
     );
+
+    this.goalPipeline = getGoalPipeline(
+      this.device, renderWGSL, 'vs_goal', 'fs_goal', 6*4, 0, sphereItemSize, spherePosOffset, 
+      sphereNorOffset, presentationFormat, 'line-list', 'none'
+    );
+
+    // this.goalPipeline = getCrowdRenderPipeline(
+    //   this.device, crowdWGSL, 6*4, 0, 
+    //   0, 0, 0, this.mesh.itemSize, this.mesh.posOffset, 
+    //   this.mesh.uvOffset, this.mesh.colorOffset, presentationFormat);
 
     this.crowdPipeline = getCrowdRenderPipeline(
       this.device, crowdWGSL, cbm.agentInstanceSize, cbm.agentPositionOffset, 
@@ -100,10 +112,13 @@ export class RenderBufferManager {
     this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4);
     this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize + 3*4 + 1*4);
     this.obstaclesUniformBuffer = getUniformBuffer(this.device, mvpSize);
+    //this.goalUniformBuffer = getUniformBuffer(this.device, mvpSize);
+    this.goalUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4);
 
     this.platformBindGroup = getTexturedUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer, gridTexture, sampler);
     this.crowdBindGroup = getUniformBindGroup(this.device, this.crowdPipeline, this.crowdUniformBuffer);
     this.obstaclesBindGroup = getUniformBindGroup(this.device, this.obstaclesPipeline, this.obstaclesUniformBuffer);
+    this.goalBindGroup = getUniformBindGroup(this.device, this.goalPipeline, this.goalUniformBuffer);
   }
   
   setRenderPassDescriptor(presentationSize) {
@@ -206,6 +221,21 @@ export class RenderBufferManager {
     passEncoder.setVertexBuffer(1, this.obstacleVertexBuffer);
     passEncoder.draw(cubeVertexCount, numObstacles, 0, 0);
   }
+
+  drawGoals(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, goalsBuffer: GPUBuffer, numGoals: number) {
+    device.queue.writeBuffer(
+      this.goalUniformBuffer,
+      0,
+      mvp.buffer,
+      mvp.byteOffset,
+      mvp.byteLength
+    );
+    passEncoder.setPipeline(this.goalPipeline);
+    passEncoder.setBindGroup(0, this.goalBindGroup);
+    passEncoder.setVertexBuffer(0, goalsBuffer);
+    passEncoder.setVertexBuffer(1, this.goalVertBuffer);
+    passEncoder.draw(sphereVertCount, numGoals, 0, 0);
+  } 
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -225,7 +255,7 @@ const getVerticesBuffer = (device: GPUDevice, vertexArray: Float32Array) => {
 }
 
 const getPipelineDescriptor = (device: GPUDevice, code, vs: string, fs: string, 
-  vertexBuffers, presentationFormat: GPUTextureFormat, primitiveType: GPUPrimitiveTopology, cullMode: GPUCullMode) => {
+  vertexBuffers, presentationFormat: GPUTextureFormat, primitiveType: GPUPrimitiveTopology, cullMode: GPUCullMode, depthWriteEnabled: boolean) => {
 
   let descriptor : GPURenderPipelineDescriptor = {
     vertex: {
@@ -249,7 +279,7 @@ const getPipelineDescriptor = (device: GPUDevice, code, vs: string, fs: string,
     // Enable depth testing so that the fragment closest to the camera
     // is rendered in front.
     depthStencil: {
-      depthWriteEnabled: true,
+      depthWriteEnabled: depthWriteEnabled,
       depthCompare: <GPUCompareFunction>'less',
       format: <GPUTextureFormat>'depth24plus',
     },
@@ -288,7 +318,47 @@ const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryP
   ]
   
   const pipeline = device.createRenderPipeline(
-    getPipelineDescriptor(device, code, vertEntryPoint, fragEntryPoint, buffers, presentationFormat, primitiveType, cullMode));
+    getPipelineDescriptor(device, code, vertEntryPoint, fragEntryPoint, buffers, presentationFormat, primitiveType, cullMode, true));
+  return pipeline;
+}
+
+const getGoalPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryPoint: string, 
+  arrayStride: number, posOffset: number, vertArrayStride: number, vertPosOffset: number, vertNorOffset: number, presentationFormat, primitiveType, cullMode) => {
+  let buffers = [
+    {
+      arrayStride: arrayStride,
+      stepMode: 'instance',
+      attributes: [
+        {
+        // position
+          shaderLocation: 0,
+          offset: 0,
+          format: 'float32x4',
+        },
+      ],
+    },
+    {
+      arrayStride: vertArrayStride,
+      attributes: [
+        {
+          // position
+          shaderLocation: 1,
+          offset: vertPosOffset,
+          format: 'float32x4'
+        },
+        {
+          // normal
+          shaderLocation: 2,
+          offset: vertNorOffset,
+          format: 'float32x4',
+        }
+      ]
+    }
+  ]
+
+  const pipeline = device.createRenderPipeline(
+    getPipelineDescriptor(device, code, vertEntryPoint, fragEntryPoint, buffers, presentationFormat, primitiveType, 'back', false)
+  );
   return pipeline;
 }
 
@@ -351,7 +421,7 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
     },   
   ];
 
-  var desc = getPipelineDescriptor(device, code, 'vs_main', 'fs_main', buffers, presentationFormat, 'triangle-list', 'back');
+  var desc = getPipelineDescriptor(device, code, 'vs_main', 'fs_main', buffers, presentationFormat, 'triangle-list', 'back', true);
   desc.primitive.frontFace = 'cw';
 
   const pipeline = device.createRenderPipeline(desc);
@@ -411,7 +481,7 @@ const getObstaclesRenderPipeline = (device: GPUDevice, code, arrayStride: number
   ];
 
   const pipeline = device.createRenderPipeline(
-    getPipelineDescriptor(device, code, "vs_main", "fs_main", buffers, presentationFormat, "triangle-list", "back"));
+    getPipelineDescriptor(device, code, "vs_main", "fs_main", buffers, presentationFormat, "triangle-list", "back", true));
   return pipeline;
 }
 
