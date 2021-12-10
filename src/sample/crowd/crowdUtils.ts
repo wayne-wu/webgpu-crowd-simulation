@@ -7,6 +7,8 @@ const minY = 0.5;
 const obstacleHeight = 2.0;
 const preferredVelocity = 1.4;
 
+const agentColor1 = [(117 + (100 * Math.random() - 50)) / 255.0, 4 / 255.0, (60 + (50 * Math.random() - 25)) / 255.0, 1];
+const agentColor2 = [17 / 255.0, (113 + (50 * Math.random() - 25)) / 255.0, ((Math.random() * 200 - 100) + 128) / 255.0, 1];
 
 export enum TestScene {
   PROXIMAL = "proximal",
@@ -344,8 +346,8 @@ export class ComputeBufferManager {
       let x = Math.floor(i/10);
       let z = i%10 + 5;
       let v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth]);
+      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -scatterWidth]);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, scatterWidth]);
     }
   }
 
@@ -356,7 +358,7 @@ export class ComputeBufferManager {
       let v = 0.5;
       this.setAgentData(
         agents, i,
-        [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
+        [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -scatterWidth]);
     }
 
     this.setObstacleData(obstacles, 0, [25,-25], 0, [20, 20]);
@@ -379,8 +381,8 @@ export class ComputeBufferManager {
       let z = 2*Math.floor(i/100) + 10;
       let v = 0.5;
       let s = (Math.random() - 0.5) + preferredVelocity;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], s, [0, -scatterWidth]);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], s, [0, scatterWidth]);
+      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], s, [0, -scatterWidth]);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], s, [0, scatterWidth]);
     }
   }
 
@@ -389,8 +391,8 @@ export class ComputeBufferManager {
       let x = i%100 - 50;
       let z = Math.floor(i/100) + 10;
       let v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth]);
+      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -scatterWidth]);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, scatterWidth]);
     }
 
     for (let i = 0; i < obstacles.length; i++)
