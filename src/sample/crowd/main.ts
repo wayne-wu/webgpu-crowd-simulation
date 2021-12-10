@@ -337,7 +337,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     // Compute new grid lines if there's a change in the gui
     if (prevGridWidth != guiParams.gridWidth) {
-      renderBuffManager.resetGridLinesBuffer(guiParams.gridWidth);
+      renderBuffManager.resizeGrid(guiParams.gridWidth);
       resetSim = true;
       simulationParams.gridWidth = guiParams.gridWidth;
       prevGridWidth = guiParams.gridWidth;
@@ -550,8 +550,6 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       // ----------------------- Draw ------------------------- //
       renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder, guiParams.gridOn);
-      //if (guiParams.gridOn)
-      //  renderBuffManager.drawGridLines(device, transformationMatrix, passEncoder);
 
       const vp = getViewProjection();
       const camPos = vec3.fromValues(camera.controls.eye[0], camera.controls.eye[1], camera.controls.eye[2]) ;
@@ -598,11 +596,6 @@ const Crowd: () => JSX.Element = () =>
         name: '../../meshes/platform.ts',
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         contents: require('!!raw-loader!../../meshes/platform.ts').default,
-      },
-      {
-        name: '../../meshes/gridLines.ts',
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        contents: require('!!raw-loader!../../meshes/gridLines.ts').default,
       },
       {
         name: '../../meshes/cube.ts',

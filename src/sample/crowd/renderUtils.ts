@@ -1,4 +1,3 @@
-
 import {
   platformVertexArray,
   platformVertexSize,
@@ -7,14 +6,6 @@ import {
   platformVertexCount,
   platformNorOffset,
 } from '../../meshes/platform';
-
-import {
-  getGridLines,
-  gridLinesVertexSize,
-  gridLinesVertexCount,
-  gridLinesPositionOffset,
-  gridLinesUVOffset
-} from '../../meshes/gridLines';
 
 import {
   cubeVertexArray,
@@ -28,7 +19,6 @@ import {
 import renderWGSL from '../../shaders/background.render.wgsl';
 import crowdWGSL from '../../shaders/crowd.render.wgsl';
 import obstaclesWGSL from '../../shaders/obstacles.render.wgsl'
-import { mat4 } from 'gl-matrix';
 import { ComputeBufferManager } from './crowdUtils';
 import { Mesh } from '../../meshes/mesh';
 
@@ -76,7 +66,7 @@ export class RenderBufferManager {
   }
 
   initBuffers(gridWidth: number) {
-    this.resetGridLinesBuffer(gridWidth);
+    this.resizeGrid(gridWidth);
 
     this.platformVertexBuffer = getVerticesBuffer(this.device, platformVertexArray);
 
@@ -140,7 +130,7 @@ export class RenderBufferManager {
     };
   }
 
-  resetGridLinesBuffer(gridWidth: number) {
+  resizeGrid(gridWidth: number) {
     // scale grid uvs so that grid scales too
     // itemSize * num verts before desired face + uvoffset
     platformVertexArray[(platformVertexSize / 4) * 12 + (platformUVOffset / 4) + 0] = gridWidth / 100.0;
@@ -171,20 +161,6 @@ export class RenderBufferManager {
     passEncoder.setBindGroup(0, this.platformBindGroup);
     passEncoder.setVertexBuffer(0, this.platformVertexBuffer);
     passEncoder.draw(platformVertexCount, 1, 0, 0);
-  }
-
-  drawGridLines(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder) {
-    device.queue.writeBuffer(
-      this.gridLinesUniformBuffer,
-      0,
-      transformationMatrix.buffer,
-      transformationMatrix.byteOffset,
-      transformationMatrix.byteLength
-    );
-    passEncoder.setPipeline(this.gridLinesPipeline);
-    passEncoder.setBindGroup(0, this.gridLinesBindGroup);
-    passEncoder.setVertexBuffer(0, this.gridLinesVertexBuffer);
-    passEncoder.draw(gridLinesVertexCount, 1, 0, 0);
   }
 
   drawCrowd(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, agentsBuffer: GPUBuffer, numAgents: number, cameraPos: vec3) {
