@@ -148,7 +148,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   let simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
-  simFolder.add(simulationParams, 'numAgents', 10, 100000, 2);
+  simFolder.add(simulationParams, 'numAgents', 16, 40000, 2).listen();  // max 40,000 so that it's easier to change values
   simFolder.add(simulationParams, 'avoidance');
   simFolder.add(simulationParams, 'testScene', Object.values(TestScene));
   simFolder.add(simulationParams, 'resetSimulation');
@@ -371,12 +371,20 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     //------------------ Compute Calls ------------------------ //
     {
       if (prevNumAgents != simulationParams.numAgents) {
-        // NOTE: we also reset the sim if the grid width changes
-        // which is checked just above this
-        prevNumAgents = simulationParams.numAgents;
-        // set reset sim to true so that simulation starts over
-        // and agents are redistributed
-        resetSim = true;
+        // if test scene is proximal, user can change num agents
+        //if (simulationParams.testScene == TestScene.PROXIMAL){
+          // round numAgents so that it is an exponent of 2 (hash grid requires this)
+          let pow2Agents = Math.pow(2, Math.round(Math.log2(simulationParams.numAgents)));
+          simulationParams.numAgents = pow2Agents;
+          // NOTE: we also reset the sim if the grid width changes
+          // which is checked just above this
+          prevNumAgents = simulationParams.numAgents;
+          // tell compute buffer manager we have a dif number of agents
+          //compBuffManager.numValidAgents = simulationParams.numAgents;
+          // set reset sim to true so that simulation starts over
+          // and agents are redistributed
+          resetSim = true;
+        //}
       }
 
       if (prevTestScene != simulationParams.testScene) {
@@ -384,38 +392,45 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         switch(simulationParams.testScene) {
           case TestScene.PROXIMAL:
             resetCameraFunc(5,10,5);
+            simulationParams.numAgents = 1<<6;
             compBuffManager.numValidAgents = 1<<6;
             simulationParams.numObstacles = 0;
             guiParams.resetCamera = () => resetCameraFunc(5, 10, 5);
             break;
           case TestScene.BOTTLENECK:
             resetCameraFunc(50,50,50);
+            simulationParams.numAgents = 1<<10;
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 2;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.DENSE:
             resetCameraFunc(50,50,50);
+            simulationParams.numAgents = 1<<15;
             compBuffManager.numValidAgents = 1<<15;
             simulationParams.numObstacles = 0;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.SPARSE:
             resetCameraFunc(50,50,50);
+            simulationParams.numAgents = 1<<12;
             compBuffManager.numValidAgents = 1<<12;
             simulationParams.numObstacles = 0;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.OBSTACLES:
             resetCameraFunc(50,50,50);
+            simulationParams.numAgents = 1<<10;
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 5;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.CIRCLE:
             resetCameraFunc(5,20,5);
+            simulationParams.numAgents = 1<<6;
             compBuffManager.numValidAgents = 1<<6;
             simulationParams.numObstacles = 0;
+            guiParams.resetCamera = () => resetCameraFunc(5, 20, 5);
             break;
         }
         resetSim = true;

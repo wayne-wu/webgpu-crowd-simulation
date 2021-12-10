@@ -1,6 +1,6 @@
 import { mat4, vec3 } from "gl-matrix";
 
-const scatterWidth = 100;
+const scatterWidth = 45;
 const diskRadius = 0.5;
 const invMass = 0.5;
 const minY = 0.5;
