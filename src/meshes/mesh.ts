@@ -29,10 +29,10 @@ export class Mesh {
 }
 
 export function loadModel(gltfPath : string, device: GPUDevice) {
-    let tmpMeshVertexArray = [];
+    const tmpMeshVertexArray = [];
 
-    let promise = new Promise((resolve, reject) => {
-        let loader = new GLTFLoader();
+    const promise = new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
 
         loader.load( gltfPath, ( gltf ) => {
             let vertCount = 0;
@@ -42,14 +42,14 @@ export function loadModel(gltfPath : string, device: GPUDevice) {
             gltf.scene.traverse( ( child ) => {
                 if ( child.isMesh ) {
                     vertCount = vertCount + child.geometry.index.count;
-                    let gltfArray = child.geometry.attributes.position.array;
-                    let gltfUVArray = child.geometry.attributes.uv.array;
-                    let gltfNormalArray = child.geometry.attributes.normal.array;
-                    let gltfIdxArray = child.geometry.index.array;
-                    let color = child.material.color;
+                    const gltfArray = child.geometry.attributes.position.array;
+                    const gltfUVArray = child.geometry.attributes.uv.array;
+                    const gltfNormalArray = child.geometry.attributes.normal.array;
+                    const gltfIdxArray = child.geometry.index.array;
+                    const color = child.material.color;
 
                     for (let i = 0; i < gltfIdxArray.length; i++){
-                        let idx = gltfIdxArray[i];
+                        const idx = gltfIdxArray[i];
                         tmpMeshVertexArray[vertArrayIdx+0] = gltfArray[idx * 3 + 0];        // position.x
                         tmpMeshVertexArray[vertArrayIdx+1] = gltfArray[idx * 3 + 1];        // position.y
                         tmpMeshVertexArray[vertArrayIdx+2] = gltfArray[idx * 3 + 2];        // position.z
@@ -68,7 +68,7 @@ export function loadModel(gltfPath : string, device: GPUDevice) {
                     }
                 }
             })
-            let mesh = new Mesh(tmpMeshVertexArray, vertCount);
+            const mesh = new Mesh(tmpMeshVertexArray, vertCount);
             resolve(mesh);
         });
     })

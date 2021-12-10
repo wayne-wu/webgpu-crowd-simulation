@@ -130,8 +130,8 @@ const SampleLayout: React.FunctionComponent<
 
   const [error, setError] = useState<unknown | null>(null);
 
-  let canvasWidth = canvasRef.current != null ? canvasRef.current.width : 1600;
-  let canvasHeight = canvasRef.current != null ? canvasRef.current.height : 800;
+  const canvasWidth = canvasRef.current != null ? canvasRef.current.width : 1600;
+  const canvasHeight = canvasRef.current != null ? canvasRef.current.height : 800;
 
   const [activeHash, setActiveHash] = useState<string | null>(null);
   useEffect(() => {

@@ -117,8 +117,8 @@ export class ComputeBufferManager {
 
     this.numAgents = Math.pow(2, Math.ceil(Math.log2(this.numValidAgents)));
 
-    const agentData = new Float32Array(this.numAgents * this.agentInstanceSize / 4); ;
-    const obstacleData = new Float32Array(this.numObstacles * this.obstacleInstanceSize / 4); ;
+    const agentData = new Float32Array(this.numAgents * this.agentInstanceSize / 4); 
+    const obstacleData = new Float32Array(this.numObstacles * this.obstacleInstanceSize / 4); 
 
     switch(this.testScene){
       case TestScene.PROXIMAL:
@@ -246,7 +246,7 @@ export class ComputeBufferManager {
   }
 
   getBindGroup(flip: boolean = false){
-    var computeBindGroup = this.device.createBindGroup({
+    const computeBindGroup = this.device.createBindGroup({
       layout: this.bindGroupLayout,
       entries: [
         {
@@ -343,11 +343,11 @@ export class ComputeBufferManager {
 
   initProximal(agents : Float32Array, obstacles: Float32Array) {
     for (let i = 0; i < this.numAgents/2; ++i) {
-      var x = Math.floor(i/10);
-      var z = i%10 + 5;
+      let x = Math.floor(i/10);
+      let z = i%10 + 5;
       x *= 1.1;
       z *= 1.1;
-      let v = 0.5;
+      const v = 0.5;
       this.setAgentData(agents, 2*i, [0.15+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth], 0);
       this.setAgentData(agents, 2*i + 1, [-0.15+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth], 1);
     }
@@ -355,9 +355,9 @@ export class ComputeBufferManager {
 
   initBottleneck(agents : Float32Array, obstacles: Float32Array) {
     for (let i = 0; i < this.numAgents; ++i) {
-      var x = 1.5*(i%10) - 8;
-      var z = 1.1*Math.floor(i/10) + 10;
-      let v = 0.5;
+      const x = 1.5*(i%10) - 8;
+      const z = 1.1*Math.floor(i/10) + 10;
+      const v = 0.5;
       this.setAgentData(
         agents, i,
         [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
@@ -369,9 +369,9 @@ export class ComputeBufferManager {
 
   initDense(agents : Float32Array, obstacles: Float32Array) {
     for (let i = 0; i < this.numAgents/2; ++i) {
-      let x = i%100 - 50;
-      let z = Math.floor(i/100) + 10;
-      let v = 0.5;
+      const x = i%100 - 50;
+      const z = Math.floor(i/100) + 10;
+      const v = 0.5;
       this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth], 0);
       this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth], 1);
     }
@@ -379,10 +379,10 @@ export class ComputeBufferManager {
 
   initSparse(agents: Float32Array, obstacles: Float32Array) {
     for (let i = 0; i < this.numAgents/2; ++i) {
-      let x = 2*(i%100) - 50;
-      let z = 2*Math.floor(i/100) + 10;
-      let v = 0.5;
-      let s = (Math.random() - 0.5) + preferredVelocity;
+      const x = 2*(i%100) - 50;
+      const z = 2*Math.floor(i/100) + 10;
+      const v = 0.5;
+      const s = (Math.random() - 0.5) + preferredVelocity;
       this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], s, [0, -scatterWidth], 0);
       this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], s, [0, scatterWidth], 1);
     }
@@ -390,9 +390,9 @@ export class ComputeBufferManager {
 
   initObstacles(agents: Float32Array, obstacles: Float32Array) {
     for (let i = 0; i < this.numAgents/2; ++i) {
-      let x = i%100 - 50;
-      let z = Math.floor(i/100) + 10;
-      let v = 0.5;
+      const x = i%100 - 50;
+      const z = Math.floor(i/100) + 10;
+      const v = 0.5;
       this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth], 0);
       this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth], 1);
     }
@@ -400,22 +400,22 @@ export class ComputeBufferManager {
     for (let i = 0; i < obstacles.length; i++)
     {
       
-      let scale = Math.random() * 3 + 1;
-      let rot = Math.random() * Math.PI;
+      const scale = Math.random() * 3 + 1;
+      const rot = Math.random() * Math.PI;
       this.setObstacleData(obstacles, i, [(Math.random()-0.5)*scatterWidth,0], rot, [scale, scale]);
     }
   }
 
   initCircle(agents: Float32Array, obstacles: Float32Array) {
 
-    let radius = this.numAgents * diskRadius / Math.PI;
+    const radius = this.numAgents * diskRadius / Math.PI;
     
     for(let i = 0; i < this.numAgents; i++) {
-      let t = (i/this.numAgents) * 2.0 * Math.PI;
-      let x = radius * Math.cos(t);
-      let z = radius * Math.sin(t);
-      let c = [Math.random(), Math.random(), Math.random(), 1];
-      let s = (Math.random() - 0.5) + preferredVelocity;
+      const t = (i/this.numAgents) * 2.0 * Math.PI;
+      const x = radius * Math.cos(t);
+      const z = radius * Math.sin(t);
+      const c = [Math.random(), Math.random(), Math.random(), 1];
+      const s = (Math.random() - 0.5) + preferredVelocity;
       this.setAgentData(agents, i, [x, z], c, [0, 0], s, [-x,-z], i);
     }
   }

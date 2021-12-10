@@ -9,14 +9,6 @@ import {
 } from '../../meshes/platform';
 
 import {
-  getGridLines,
-  gridLinesVertexSize,
-  gridLinesVertexCount,
-  gridLinesPositionOffset,
-  gridLinesUVOffset
-} from '../../meshes/gridLines';
-
-import {
   cubeVertexArray,
   cubeVertexSize,
   cubeUVOffset,
@@ -104,7 +96,7 @@ export class RenderBufferManager {
   setBindGroups(gridTexture: GPUTexture, sampler: GPUSampler) {
     // NOTE: Is there really no way to share the same uniform buffer across different pipelines?
     // Seems very efficient to have to redeclare pretty much the same data multiple times
-    let mvpSize = 4 * 16;  // mat4
+    const mvpSize = 4 * 16;  // mat4
     this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4);
     this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize + 3*4 + 1*4);
     this.obstaclesUniformBuffer = getUniformBuffer(this.device, mvpSize);
@@ -138,12 +130,6 @@ export class RenderBufferManager {
     };
   }
 
-  resetGridLinesBuffer(gridWidth: number) {
-    // Compute the grid lines based on an input gridWidth
-    let gridLinesVertexArray = getGridLines(gridWidth);
-    this.gridLinesVertexBuffer = getVerticesBuffer(this.device, gridLinesVertexArray);
-  }
-
   drawPlatform(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder, gridOn: boolean) {
     const gridOnArray = new Float32Array([gridOn ? 1.0 : 0.0]);
     device.queue.writeBuffer(
@@ -162,20 +148,6 @@ export class RenderBufferManager {
     passEncoder.setBindGroup(0, this.platformBindGroup);
     passEncoder.setVertexBuffer(0, this.platformVertexBuffer);
     passEncoder.draw(platformVertexCount, 1, 0, 0);
-  }
-
-  drawGridLines(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder) {
-    device.queue.writeBuffer(
-      this.gridLinesUniformBuffer,
-      0,
-      transformationMatrix.buffer,
-      transformationMatrix.byteOffset,
-      transformationMatrix.byteLength
-    );
-    passEncoder.setPipeline(this.gridLinesPipeline);
-    passEncoder.setBindGroup(0, this.gridLinesBindGroup);
-    passEncoder.setVertexBuffer(0, this.gridLinesVertexBuffer);
-    passEncoder.draw(gridLinesVertexCount, 1, 0, 0);
   }
 
   drawCrowd(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, agentsBuffer: GPUBuffer, numAgents: number, cameraPos: vec3) {
@@ -221,7 +193,7 @@ export class RenderBufferManager {
     passEncoder.setVertexBuffer(1, this.obstacleVertexBuffer);
     passEncoder.draw(cubeVertexCount, numObstacles, 0, 0);
   }
-};
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //                         renderBufferManager Helpers                                //
@@ -242,7 +214,7 @@ const getVerticesBuffer = (device: GPUDevice, vertexArray: Float32Array) => {
 const getPipelineDescriptor = (device: GPUDevice, code, vs: string, fs: string, 
   vertexBuffers, presentationFormat: GPUTextureFormat, primitiveType: GPUPrimitiveTopology, cullMode: GPUCullMode) => {
 
-  let descriptor : GPURenderPipelineDescriptor = {
+  const descriptor : GPURenderPipelineDescriptor = {
     vertex: {
       module: device.createShaderModule({code: code}),
       entryPoint: vs,
@@ -276,7 +248,7 @@ const getPipelineDescriptor = (device: GPUDevice, code, vs: string, fs: string,
 // Create a pipeline given the parameters
 const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryPoint: string, 
                             arrayStride: number, posOffset: number, uvOffset: number, norOffset: number, presentationFormat, primitiveType, cullMode) => {
-  let buffers = [
+  const buffers = [
     {
       arrayStride: arrayStride,
       attributes: [
@@ -309,7 +281,7 @@ const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryP
 
 const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, velOffset: number, vertNorOffset: number,
                                        vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, vertColorOffset: number, presentationFormat) => {
-  let buffers = [
+  const buffers = [
     {
       // instanced agents buffer
       arrayStride: arrayStride,
@@ -375,7 +347,7 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
 
 const getObstaclesRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, 
   vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, vertNorOffset: number, presentationFormat) => {
-  let buffers = [
+  const buffers = [
     {
       arrayStride: arrayStride,
       stepMode: 'instance',

@@ -4,6 +4,8 @@
 
 by [Ashley Alexander-Lee](), [Matt Elser](), and [Wayne Wu](https://www.wuwayne.com/).
 
+[**Check it out here! (WebGPU Required)**](https://www.wuwayne.com/webgpu-crowd-simulation/)
+
 ![Teaser Image](img/duck_crowd_sim.png)
 
 ## Overview
