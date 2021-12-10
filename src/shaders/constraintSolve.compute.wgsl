@@ -24,7 +24,7 @@ fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<func
   let x_ij = agent.x - agent_j.x;
 
   // relative velocity
-  let v_ij = agent.v - agent_j.v;
+  let v_ij = (1.0/dt) * (agent.xp - agent.x - agent_j.xp + agent_j.x);
 
   let a = dot(v_ij, v_ij);
   let b = -dot(x_ij, v_ij);

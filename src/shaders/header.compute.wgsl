@@ -1,8 +1,8 @@
 // ----- Parameteres -----
 let eps : f32 = 0.0001;
-let t0 : f32 = 100.0;           // paper = 20
+let t0 : f32 = 20.0;           // paper = 20
 let tObstacle : f32 = 20.0;
-let k_longrange : f32 = 0.24;   // paper = 0.24 [0-1]
+let k_longrange : f32 = 0.20;   // paper = 0.24 [0-1]
 let k_obstacle : f32 = 0.24;
 let k_shortrange : f32 = 1.0;   // paper = 1.0 [0,1]
 let k_avoid : f32 = 0.2;
@@ -12,8 +12,8 @@ let nearRadius : f32 = 2.5;
 let mu_static : f32 = 0.21;     // paper = 0.21
 let mu_kinematic : f32 = 0.15;  // papser = ?
 let ksi : f32 = 0.0385;         // paper = 0.0385
-let xsph_c : f32 = 1.0;         // paper = 7.0
-let xsph_h : f32 = 10.0;        // paper = 217.0 // the smoothing distance specified in the paper (assumes particles with radius 1)
+let xsph_c : f32 = 7.0;         // paper = 7.0
+let xsph_h : f32 = 217.0;        // paper = 217.0 // the smoothing distance specified in the paper (assumes particles with radius 1)
 let dir_blending : f32 = 0.8; 
 let wall_radius : f32 = 0.5;  
 

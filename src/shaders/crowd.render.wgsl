@@ -88,7 +88,7 @@ fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
   var lambertTerm = dot(normalize(lightDir), normalize(in.mesh_nor));
 
   var meshCol = vec4<f32>(in.mesh_col, 1.0);
-  if (meshCol.r == 1.0 && meshCol.g == 1.0 && meshCol.b == 1.0){
+  if (meshCol.r > 0.99 && meshCol.g > 0.99 && meshCol.b > 0.99){
     meshCol = in.color;
   }
   var albedo = in.color * 0.3 + meshCol * 0.7;
