@@ -112,44 +112,55 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     return;
   }
 
-  let gridWidth = i32(sim_params.gridWidth);
-  let gridHeight = i32(sim_params.gridWidth);
-  // compute neighbors
-  var nearCount = 0u;
-  var farCount = 0u;
-  //// TODO don't hardcode 9 cells 
-  let cellsToCheck = 9u;
-  var nearCellNums = array<i32, 9u>(
-    agent.cell + gridWidth - 1, agent.cell + gridWidth, agent.cell + gridWidth + 1,
-    agent.cell - 1, agent.cell, agent.cell+1, 
-    agent.cell - gridWidth - 1, agent.cell - gridWidth, agent.cell - gridWidth + 1);
+  let gridWidth = sim_params.gridWidth;
+  let gridHeight = gridWidth;//sim_params.gridWidth;
+  // TODO don't hardcode
+  let cellWidth = 1000.0 / gridWidth;
+  // compute cells that could conceivably contain neighbors
+  let bboxCorners = getBBoxCornerCells(agent.x.x,
+                                       agent.x.z,
+                                       gridWidth,
+                                       cellWidth,
+                                       nearRadius);
 
-  for (var c : u32 = 0u; c < cellsToCheck; c = c + 1u ){
-    let cellIdx = nearCellNums[c];
-    if (cellIdx < 0 || cellIdx >= gridWidth * gridHeight){
+  let minX = bboxCorners[0];
+  let minY = bboxCorners[1];
+  let maxX = bboxCorners[2];
+  let maxY = bboxCorners[3];
+
+  //for (var c : u32 = 0u; c < cellsToCheck; c = c + 1u ){
+  for (var cellY = minY; cellY <= maxY; cellY = cellY + 1){
+    if (cellY < 0 || cellY >= i32(gridHeight)){
       continue;
     }
-    let cell : CellIndices = grid.cells[cellIdx];
-    for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
+    for (var cellX = minX; cellX <= maxX; cellX = cellX + 1){
 
-      if (idx == i) { 
-        // ignore ourselves
-        continue; 
-      }
-
-      var neighbor = agentData_r.agents[i];
-      
-      // Only look at neighbor in the same crowd group
-      if(agent.group != neighbor.group){
+      if (cellX < 0 || cellX >= i32(gridWidth)){
         continue;
       }
-      
-      var d = distance(agent.xp, neighbor.xp);  // Should this be xp or x?
-      if (d >= nearRadius){
-        continue;
+      let cellIdx = cell2dto1d(cellX, cellY, gridWidth);
+      let cell : CellIndices = grid.cells[cellIdx];
+      for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
+
+        if (idx == i) { 
+          // ignore ourselves
+          continue; 
+        }
+
+        var neighbor = agentData_r.agents[i];
+        
+        // Only look at neighbor in the same crowd group
+        if(agent.group != neighbor.group){
+          continue;
+        }
+        
+        var d = distance(agent.xp, neighbor.xp);  // Should this be xp or x?
+        if (d >= nearRadius){
+          continue;
+        }
+        var w = getW(d*d);
+        velAvg = velAvg + (agent.v - neighbor.v) * w;
       }
-      var w = getW(d*d);
-      velAvg = velAvg + (agent.v - neighbor.v) * w;
     }
   }
   agent.v = agent.v + xsph_c * velAvg;

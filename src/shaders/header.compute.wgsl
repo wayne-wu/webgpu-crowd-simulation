@@ -151,22 +151,22 @@ fn cellSpaceToCell2d(x: f32, y: f32, cellWidth: f32) -> vec2<i32>{
 fn worldSpacePosToCell2d(x: f32, z: f32, gridWidth: f32, cellWidth: f32) -> vec2<i32> {
   let pos = worldSpacePosToCellSpace(x, z, gridWidth, cellWidth); 
   
-  return cellSpaceToCell2d(x, z, cellWidth);
+  return cellSpaceToCell2d(pos.x, pos.y, cellWidth);
 }
 
 fn getBBoxCornerCells(worldX: f32, 
-                      worldY: f32, 
+                      worldZ: f32, 
                       gridWidth: f32, 
                       cellWidth: f32,
                       radius: f32) -> vec4<i32>{
 
   let upperLeft = worldSpacePosToCell2d(worldX + radius, 
-                                 worldY + radius, 
+                                 worldZ + radius, 
                                  gridWidth, 
                                  cellWidth);
 
   let backRight = worldSpacePosToCell2d(worldX - radius, 
-                                 worldY - radius, 
+                                 worldZ - radius, 
                                  gridWidth, 
                                  cellWidth);
 

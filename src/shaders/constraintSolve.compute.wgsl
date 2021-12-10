@@ -8,9 +8,14 @@
 [[binding(3), group(0)]] var<storage, read> grid : Grid;
 [[binding(4), group(0)]] var<storage, read> obstacleData : Obstacles;
 
-fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<function, i32>, totalDx: ptr<function, vec3<f32>>)
+fn long_range_constraint(agent: Agent, 
+                         agent_j: Agent, 
+                         itr: i32, 
+                         dt : f32,
+                         count: ptr<function, i32>, 
+                         totalDx: ptr<function, vec3<f32>>)
 {
-  let dt = sim_params.deltaTime;
+  //let dt = sim_params.deltaTime;
 
   let r = agent.r + agent_j.r;
   var r_sq = r * r;
@@ -76,6 +81,7 @@ fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<func
 
       // tangential relative displacement
       let d_tangent = d_vec - dot(d_vec, n)*n;
+      //dx = dx + (w * d_tangent) / 2.0;
       dx = w * d_tangent;
     }
 
@@ -89,59 +95,72 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
 
   var itr = sim_params.iteration;
+  let dt = sim_params.deltaTime;
 
   var agent = agentData_r.agents[idx];
   var totalDx = vec3<f32>(0.0, 0.0, 0.0);
   var neighborCount = 0;
-  let dt = sim_params.deltaTime;
 
   // 4.4 Long Range Collision
   if (agent.cell < 0){
-    // ignore invalid cells
-    agent.c = vec4<f32>(1.0, 0.0, 0.0, 1.0);
     agentData_w.agents[idx] = agent;
     return;
   }
 
-  let gridWidth = i32(sim_params.gridWidth);
-  let gridHeight = i32(sim_params.gridWidth);
-  // compute neighbors
-  var nearCount = 0u;
-  var farCount = 0u;
-  //// TODO don't hardcode 9 cells 
-  let cellsToCheck = 9u;
-  var nearCellNums = array<i32, 9u>(
-    agent.cell + gridWidth - 1, agent.cell + gridWidth, agent.cell + gridWidth + 1,
-    agent.cell - 1, agent.cell, agent.cell+1, 
-    agent.cell - gridWidth - 1, agent.cell - gridWidth, agent.cell - gridWidth + 1);
+  let gridWidth = sim_params.gridWidth;
+  let gridHeight = gridWidth;//sim_params.gridWidth;
+  // TODO don't hardcode
+  let cellWidth = 1000.0 / gridWidth;
+  // compute cells that could conceivably contain neighbors
+  let bboxCorners = getBBoxCornerCells(agent.x.x,
+                                       agent.x.z,
+                                       gridWidth,
+                                       cellWidth,
+                                       farRadius);
 
-  for (var c : u32 = 0u; c < cellsToCheck; c = c + 1u ){
-    let cellIdx = nearCellNums[c];
-    if (cellIdx < 0 || cellIdx >= gridWidth * gridHeight){
+  let minX = bboxCorners[0];
+  let minY = bboxCorners[1];
+  let maxX = bboxCorners[2];
+  let maxY = bboxCorners[3];
+
+  //for (var c : u32 = 0u; c < cellsToCheck; c = c + 1u ){
+  for (var cellY = minY; cellY <= maxY; cellY = cellY + 1){
+    if (cellY < 0 || cellY >= i32(gridHeight)){
       continue;
     }
-    let cell : CellIndices = grid.cells[cellIdx];
-    for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
+    for (var cellX = minX; cellX <= maxX; cellX = cellX + 1){
 
-      if (idx == i) { 
-        // ignore ourselves
-        continue; 
-      }
-      let agent_j = agentData_r.agents[i];
-
-      let dist = distance(agent.x, agent_j.x);
-
-      if (dist >= farRadius){
+      if (cellX < 0 || cellX >= i32(gridWidth)){
         continue;
       }
+      let cellIdx = cell2dto1d(cellX, cellY, gridWidth);
+      let cell : CellIndices = grid.cells[cellIdx];
+      for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
 
-      long_range_constraint(agent, agent_j, itr, &neighborCount, &totalDx);
+        if (idx == i) { 
+          // ignore ourselves
+          continue; 
+        }
+        let agent_j = agentData_r.agents[i];
+
+        let dist = distance(agent.x, agent_j.x);
+
+        if (dist >= farRadius || dist < nearRadius){
+          continue;
+        }
+
+        long_range_constraint(agent, agent_j, itr, dt, &neighborCount, &totalDx);
+      }
     }
   }
 
   if (neighborCount > 0) {
     agent.xp = agent.xp + avgCoefficient * totalDx / f32(neighborCount);
   }
+
+  // TODO remove
+  //let foo = f32(neighborCount) / 4.0; 
+  //agent.c.z = foo;
 
   // 4.7 Obstacles Collision
   totalDx = vec3<f32>(0.0);
