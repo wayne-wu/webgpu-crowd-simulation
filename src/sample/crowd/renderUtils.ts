@@ -76,6 +76,8 @@ export class RenderBufferManager {
   }
 
   initBuffers(gridWidth: number) {
+    this.resetGridLinesBuffer(gridWidth);
+
     this.platformVertexBuffer = getVerticesBuffer(this.device, platformVertexArray);
 
     this.prototypeVertexBuffer = getVerticesBuffer(this.device, cubeVertexArray);
@@ -139,9 +141,16 @@ export class RenderBufferManager {
   }
 
   resetGridLinesBuffer(gridWidth: number) {
-    // Compute the grid lines based on an input gridWidth
-    let gridLinesVertexArray = getGridLines(gridWidth);
-    this.gridLinesVertexBuffer = getVerticesBuffer(this.device, gridLinesVertexArray);
+    // scale grid uvs so that grid scales too
+    // itemSize * num verts before desired face + uvoffset
+    platformVertexArray[(platformVertexSize / 4) * 12 + (platformUVOffset / 4) + 0] = gridWidth / 100.0;
+    platformVertexArray[(platformVertexSize / 4) * 12 + (platformUVOffset / 4) + 1] = gridWidth / 100.0;
+    platformVertexArray[(platformVertexSize / 4) * 13 + (platformUVOffset / 4) + 1] = gridWidth / 100.0;
+    platformVertexArray[(platformVertexSize / 4) * 15 + (platformUVOffset / 4) + 0] = gridWidth / 100.0;
+    platformVertexArray[(platformVertexSize / 4) * 16 + (platformUVOffset / 4) + 0] = gridWidth / 100.0;
+    platformVertexArray[(platformVertexSize / 4) * 16 + (platformUVOffset / 4) + 1] = gridWidth / 100.0;
+
+    this.platformVertexBuffer = getVerticesBuffer(this.device, platformVertexArray);
   }
 
   drawPlatform(device: GPUDevice, transformationMatrix: Float32Array, passEncoder: GPURenderPassEncoder, gridOn: boolean) {

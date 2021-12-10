@@ -44,7 +44,6 @@ const MainLayout: React.FunctionComponent<AppProps> = ({
         />
       </Head>
       <div className={styles.wrapper}>
-        {Crowd}
         {/* <nav className={`${styles.panel} ${styles.container}`}>
           <h1>
             <Link href="/">{title}</Link>

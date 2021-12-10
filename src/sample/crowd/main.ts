@@ -202,7 +202,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   let gridTexture: GPUTexture;
   {
     const img = document.createElement('img');
-    img.src = require('../../../assets/img/checkerboard.png');
+    img.src = require('../../../assets/img/grid.png');
     await img.decode();
     const imageBitmap = await createImageBitmap(img);
 
@@ -224,6 +224,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const sampler = device.createSampler({
     magFilter: 'linear',
     minFilter: 'linear',
+    addressModeU: 'repeat', // make grid texture tileable so it's resizable
+    addressModeV: 'repeat'
   });
 
   var bufManagerExists = false;
