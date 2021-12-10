@@ -256,7 +256,7 @@ const getVerticesBuffer = (device: GPUDevice, vertexArray: Float32Array) => {
 const getPipelineDescriptor = (device: GPUDevice, code, vs: string, fs: string, 
   vertexBuffers, presentationFormat: GPUTextureFormat, primitiveType: GPUPrimitiveTopology, cullMode: GPUCullMode, depthWriteEnabled: boolean) => {
 
-  let descriptor : GPURenderPipelineDescriptor = {
+  const descriptor : GPURenderPipelineDescriptor = {
     vertex: {
       module: device.createShaderModule({code: code}),
       entryPoint: vs,
@@ -290,7 +290,7 @@ const getPipelineDescriptor = (device: GPUDevice, code, vs: string, fs: string,
 // Create a pipeline given the parameters
 const getPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEntryPoint: string, 
                             arrayStride: number, posOffset: number, uvOffset: number, norOffset: number, presentationFormat, primitiveType, cullMode) => {
-  let buffers = [
+  const buffers = [
     {
       arrayStride: arrayStride,
       attributes: [
@@ -363,7 +363,7 @@ const getGoalPipeline = (device: GPUDevice, code, vertEntryPoint: string, fragEn
 
 const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, colOffset: number, velOffset: number, vertNorOffset: number,
                                        vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, vertColorOffset: number, presentationFormat) => {
-  let buffers = [
+  const buffers = [
     {
       // instanced agents buffer
       arrayStride: arrayStride,
@@ -429,7 +429,7 @@ const getCrowdRenderPipeline = (device: GPUDevice, code, arrayStride: number, po
 
 const getObstaclesRenderPipeline = (device: GPUDevice, code, arrayStride: number, posOffset: number, 
   vertArrayStride: number, vertPosOffset: number, vertUVOffset: number, vertNorOffset: number, presentationFormat) => {
-  let buffers = [
+  const buffers = [
     {
       arrayStride: arrayStride,
       stepMode: 'instance',

@@ -1,4 +1,5 @@
-var CameraControls = require('3d-view-controls');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const CameraControls = require('3d-view-controls');
 import {vec3, mat4} from 'gl-matrix';
 
 class Camera {
@@ -37,6 +38,6 @@ class Camera {
     vec3.add(this.target, this.position, this.direction);
     mat4.lookAt(this.viewMatrix, this.controls.eye, this.controls.center, this.controls.up);
   }
-};
+}
 
 export default Camera;

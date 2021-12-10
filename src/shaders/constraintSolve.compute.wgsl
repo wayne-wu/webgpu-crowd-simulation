@@ -30,17 +30,17 @@ fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<func
   let b = -dot(x_ij, v_ij);
   let c = dot(x_ij, x_ij) - r_sq;
   var discr = b*b - a*c;
-  if (discr <= 0.0 || abs(a) < 0.00001) { return; }
+  if (discr < 0.0 || abs(a) < eps) { return; }
 
   discr = sqrt(discr);
 
   // Compute exact time to collision
-  let t1 = (b - discr)/a;
-  let t2 = (b + discr)/a;
-  var t = select(t1, t2, t2 < t1 && t2 > 0.0);
+  let t = (b - discr)/a;
+  //let t2 = (b + discr)/a;
+  //var t = select(t1, t2, t2 < t1 && t2 > 0.0);
 
   // Prune out invalid case
-  if (t < 0.0 || t > t0) { return; }
+  if (t < eps || t > t0) { return; }
 
   // Get time before and after collision
   let t_nocollision = dt * floor(t/dt);
@@ -82,81 +82,6 @@ fn long_range_constraint(agent: Agent, agent_j: Agent, itr: i32, count: ptr<func
     *totalDx = *totalDx + k * dx;
     *count = *count + 1;
   }
-}
-
-fn intersect_line(p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: vec2<f32>, n: ptr<function, vec2<f32>>) -> f32
-{
-  let s1 = p1 - p0;
-  let s2 = p3 - p2;
-
-  var den = (-s2.x * s1.y + s1.x * s2.y);
-  if (den < 0.00001) { return -1.0; }  // colinear
-
-  den = 1.0/den;
-  let s = (-s1.y * (p0.x - p2.x) + s1.x * (p0.y - p2.y)) * den;
-  let t = ( s2.x * (p0.y - p2.y) - s2.y * (p0.x - p2.x)) * den;
-
-  if (s > 0.0 && s < 1.0 && t > 0.0 && t < 1.0)
-  {
-    (*n).x = -s2.y;
-    (*n).y = s2.x;
-    return t;
-  }
-
-  return -1.0;
-}
-
-fn obstacle_constraint(agent: Agent, obstacle: Obstacle, itr: i32, count: ptr<function, i32>, totalDx: ptr<function, vec3<f32>>)
-{
-  // Create Model Matrix
-  let c = cos(obstacle.rot);
-  let s = sin(obstacle.rot);
-  var m = mat4x4<f32>();
-  m[0] = vec4<f32>(obstacle.scale.x*c, 0.0, -s, 0.0);
-  m[1] = vec4<f32>(0.0, obstacle.scale.y, 0.0, 0.0);
-  m[2] = vec4<f32>(s, 0.0, obstacle.scale.z*c, 0.0);
-  m[3] = vec4<f32>(obstacle.pos, 1.0);
-
-  // Get Corner Points in World Position (Cube)
-  let l = 1.1;
-  var p1 = (m * vec4<f32>(l,0.0,l,1.0)).xz;
-  var p2 = (m * vec4<f32>(l,0.0,-l,1.0)).xz;
-  var p3 = (m * vec4<f32>(-l,0.0,-l,1.0)).xz;
-  var p4 = (m * vec4<f32>(-l,0.0,l,1.0)).xz;
-
-  var v = (agent.xp - agent.x)/sim_params.deltaTime;
-  var a0 = agent.xp.xz;
-  var a1 = (agent.xp + tObstacle * v).xz;  // max look-ahead
-  
-  // Intersection test with the four edges
-  var n_tmp : vec2<f32>;
-  var n_min : vec2<f32>;
-  var t_tmp : f32;
-  var t_min : f32 = tObstacle;
-  t_tmp = intersect_line(a0, a1, p1, p2, &n_tmp);
-  if (t_tmp > 0.0 && t_tmp < t_min) { t_min = t_tmp; n_min = n_tmp; }
-  t_tmp = intersect_line(a0, a1, p2, p3, &n_tmp);
-  if (t_tmp > 0.0 && t_tmp < t_min) { t_min = t_tmp; n_min = n_tmp; }
-  t_tmp = intersect_line(a0, a1, p3, p4, &n_tmp);
-  if (t_tmp > 0.0 && t_tmp < t_min) { t_min = t_tmp; n_min = n_tmp; }
-  t_tmp = intersect_line(a0, a1, p4, p1, &n_tmp);
-  if (t_tmp > 0.0 && t_tmp < t_min) { t_min = t_tmp; n_min = n_tmp; }
-
-  if (t_min < 1.0) { 
-    t_min = t_min * tObstacle;  // remap t_min to 0 to tObstacle
-    
-    //if(dot(v.xz, n_min) > 0.0) { n_min = -n_min; }  // flip the normal direction
-    //var n = vec3<f32>(n_min.x, 0.0, n_min.y);  // contact normal
-
-    // Use the radial normal as the contact normal so that there's some tangential velocity
-    var n = normalize((agent.xp + t_min * v) - obstacle.pos);
-
-    var k = k_obstacle * exp(-t_min*t_min/tObstacle);
-    k = 1.0 - pow(1.0 - k, 1.0/(f32(itr + 1)));
-    var dx = k * n;
-    *totalDx = *totalDx + dx;
-    *count = *count + 1;
-  } 
 }
 
 [[stage(compute), workgroup_size(64)]]
@@ -218,16 +143,17 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     agent.xp = agent.xp + avgCoefficient * totalDx / f32(neighborCount);
   }
 
+  // 4.7 Obstacles Collision
   totalDx = vec3<f32>(0.0);
   neighborCount = 0;
-
-  // 4.7 Obstacles Avoidance
+  
   for (var j : u32 = 0u; j < arrayLength(&obstacleData.obstacles); j = j + 1u){
-    obstacle_constraint(agent, obstacleData.obstacles[j], itr, &neighborCount, &totalDx);
+    obstacle_constraint(agent, obstacleData.obstacles[j], &neighborCount, &totalDx);
   }
 
   if (neighborCount > 0) {
-    agent.xp = agent.xp + avgCoefficient * totalDx / f32(neighborCount);
+    let k = 1.0 - pow(1.0 - k_obstacle, 1.0/(f32(itr + 1)));
+    agent.xp = agent.xp + avgCoefficient * k * totalDx / f32(neighborCount);
   }
 
   // Store the new agent value

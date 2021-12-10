@@ -34,7 +34,7 @@ function getSortStepWGSL(numAgents : number, k : number, j : number, ){
   // bitonic sort requires a device-wide join after every "step" to avoid
   // race conditions. The least gross way I can think to do that is to create a new pipeline
   // for each step.
-  let baseWGSL = `
+  const baseWGSL = `
   [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
 
   fn swap(idx1 : u32, idx2 : u32) {
@@ -123,11 +123,11 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   let prevGridWidth = guiParams.gridWidth;
   resetSim = true;
 
-  let gridFolder = gui.addFolder("Grid");
+  const gridFolder = gui.addFolder("Grid");
   gridFolder.add(guiParams, 'gridWidth', 1, 5000, 1);
   gridFolder.add(guiParams, 'gridOn');
   gridFolder.open();
-  let camFolder = gui.addFolder("Camera");
+  const camFolder = gui.addFolder("Camera");
   camFolder.add(guiParams, 'resetCamera');
   camFolder.open();
 
@@ -146,7 +146,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   let prevNumAgents = simulationParams.numAgents;
   let prevTestScene = TestScene.DENSE;
   
-  let simFolder = gui.addFolder("Simulation");
+  const simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
   simFolder.add(simulationParams, 'numAgents', 16, 40000, 2).listen();  // max 40,000 so that it's easier to change values
@@ -160,7 +160,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     model: 'Duck'
   }
   let prevModel = 'Duck';
-  let models = Array.from(Object.keys(meshDictionary));
+  const models = Array.from(Object.keys(meshDictionary));
   models.push('Cube');
   gui.add(modelParams, 'model', models);
 
@@ -191,7 +191,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   /////////////////////////////////////////////////////////////////////////
   //                     Compute Buffer Setup                            //
   /////////////////////////////////////////////////////////////////////////
-  var compBuffManager = new ComputeBufferManager(device,
+  const compBuffManager = new ComputeBufferManager(device,
                                                  simulationParams.testScene,
                                                  simulationParams.numAgents,
                                                  simulationParams.gridWidth);
@@ -199,7 +199,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //////////////////////////////////////////////////////////////////////////
   //                Render Buffer and Pipeline Setup                      //
   //////////////////////////////////////////////////////////////////////////
-  var renderBuffManager : RenderBufferManager;
+  let renderBuffManager : RenderBufferManager;
 
   let gridTexture: GPUTexture;
   {
@@ -230,9 +230,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     addressModeV: 'repeat'
   });
 
-  var bufManagerExists = false;
+  let bufManagerExists = false;
   if (modelParams.model == 'Cube'){
-    let mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
+    const mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
     mesh.scale = 0.2;
     renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
       presentationFormat, presentationSize,
@@ -240,7 +240,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     bufManagerExists = true;
   }
   else{
-    var modelData = meshDictionary[modelParams.model];
+    const modelData = meshDictionary[modelParams.model];
     loadModel(modelData.filename, device).then((mesh : Mesh) => {
       mesh.scale = modelData.scale;
       renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
@@ -255,11 +255,11 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   // Create Compute Pipelines
   //////////////////////////////////////////////////////////////////////////////
   {
-    var computeShadersPreSort = [
+    const computeShadersPreSort = [
       headerWGSL + explicitIntegrationWGSL, 
       headerWGSL + assignCellsWGSL,
     ];
-    var computeShadersPostSort = [
+    const computeShadersPostSort = [
       headerWGSL + buildHashGrid,
       headerWGSL + contactSolveWGSL, 
       headerWGSL + constraintSolveWGSL, 
@@ -352,7 +352,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       bufManagerExists = false;
       prevModel = modelParams.model;
       if (modelParams.model == 'Cube'){
-        let mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
+        const mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
         mesh.scale = 0.2;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,
@@ -403,9 +403,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             guiParams.resetCamera = () => resetCameraFunc(5, 10, 5);
             break;
           case TestScene.BOTTLENECK:
-            resetCameraFunc(50,50,50);
-            simulationParams.numAgents = 1<<10;
-            compBuffManager.numValidAgents = 1<<10;
+            resetCameraFunc(20,20,20);
+            simulationParams.numAgents = 1<<9;
+            compBuffManager.numValidAgents = 1<<9;
             simulationParams.numObstacles = 2;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
@@ -558,7 +558,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       const vp = getViewProjection();
       const camPos = vec3.fromValues(camera.controls.eye[0], camera.controls.eye[1], camera.controls.eye[2]) ;
-      let agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents1Buffer : compBuffManager.agents2Buffer;
+      const agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents1Buffer : compBuffManager.agents2Buffer;
       renderBuffManager.drawCrowd(device, vp, passEncoder, agentsBuffer, compBuffManager.numAgents, camPos);
 
       if (simulationParams.numObstacles > 0)
