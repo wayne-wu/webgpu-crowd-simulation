@@ -1,24 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Utilities
-////////////////////////////////////////////////////////////////////////////////
-var<private> rand_seed : vec2<f32>;
-
-fn rand() -> f32 {
-    rand_seed.x = fract(cos(dot(rand_seed, vec2<f32>(23.14077926, 232.61690225))) * 136.8168);
-    rand_seed.y = fract(cos(dot(rand_seed, vec2<f32>(54.47856553, 345.84153136))) * 534.7645);
-    return rand_seed.y;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Vertex shader
 ////////////////////////////////////////////////////////////////////////////////
-[[block]] struct RenderParams {
-  modelViewProjectionMatrix : mat4x4<f32>;
-  cameraPos : vec3<f32>;
-  agentScale : f32;
-};
-
-[[binding(0), group(0)]] var<uniform> render_params : RenderParams;
+[[binding(0), group(0)]] var<uniform> scene : Scene;
+[[binding(0), group(1)]] var<uniform> model : Model;
 
 struct VertexInput {
   [[location(0)]] position : vec3<f32>;  // agent position (world space)
@@ -37,6 +21,7 @@ struct VertexOutput {
   [[location(2)]]       mesh_uv  : vec2<f32>;
   [[location(3)]]       mesh_nor : vec4<f32>;
   [[location(4)]]       mesh_col : vec3<f32>;
+  [[location(5)]]       shadowPos : vec3<f32>;
 };
 
 [[stage(vertex)]]
@@ -44,17 +29,17 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 
   var vel = normalize(in.velocity);
 
-  var model = mat4x4<f32>();
+  var instance = mat4x4<f32>();
   var scale = mat4x4<f32>();
-  scale[0] = vec4<f32>(render_params.agentScale, 0.0, 0.0, 0.0);
-  scale[1] = vec4<f32>(0.0, render_params.agentScale, 0.0, 0.0);
-  scale[2] = vec4<f32>(0.0, 0.0, render_params.agentScale, 0.0);
+  scale[0] = vec4<f32>(1.0, 0.0, 0.0, 0.0);
+  scale[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
+  scale[2] = vec4<f32>(0.0, 0.0, 1.0, 0.0);
   scale[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
   var rot = mat4x4<f32>();
   var forward = vel;
   var up = vec3<f32>(0.0, 1.0, 0.0);
-  var right = normalize(cross(forward.xyz, up.xyz));
+  var right = normalize(cross(forward, up));
   rot[0] = vec4<f32>(right, 0.0);
   rot[1] = vec4<f32>(up, 0.0);
   rot[2] = vec4<f32>(forward, 0.0);
@@ -66,31 +51,61 @@ fn vs_main(in : VertexInput) -> VertexOutput {
   trans[2] = vec4<f32>(0.0, 0.0, 1.0, 0.0);
   trans[3] = vec4<f32>(in.position, 1.0);
 
-  model = trans * rot * scale;
+  instance = trans * rot * scale;
 
-  var out : VertexOutput;  
-  out.position = render_params.modelViewProjectionMatrix * model * in.mesh_pos;
+  var out : VertexOutput;
+  out.mesh_pos = instance * model.modelMatrix * in.mesh_pos;
+  out.position = scene.cameraViewProjMatrix * out.mesh_pos;
   out.color = in.color;
   out.mesh_uv = in.mesh_uv;
-  out.mesh_pos = in.mesh_pos;
-  out.mesh_nor = rot * in.mesh_nor;
+
+  out.mesh_nor = instance * model.modelMatrix * in.mesh_nor;
   out.mesh_col = in.mesh_col;
+
+  // Shadow Mapping
+  let posFromLight : vec4<f32> = scene.lightViewProjMatrix * out.mesh_pos;
+
+  out.shadowPos = vec3<f32>(
+    posFromLight.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5, 0.5),
+    posFromLight.z
+  );
+
   return out;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Fragment shader
 ////////////////////////////////////////////////////////////////////////////////
+[[group(0), binding(1)]] var shadowSampler: sampler_comparison;
+[[group(0), binding(2)]] var shadowMap: texture_depth_2d;
+
+let ambientFactor : f32 = 0.2;
+
 [[stage(fragment)]]
 fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
-  var cameraDir = in.position.xyz - render_params.cameraPos;
-  var lightDir = vec4<f32>(1.0, 1.0, 1.0, 0.0);
-  var lambertTerm = dot(normalize(lightDir), normalize(in.mesh_nor));
+
+  var visibility : f32 = 0.0;
+  for (var y : i32 = -1 ; y <= 1 ; y = y + 1) {
+      for (var x : i32 = -1 ; x <= 1 ; x = x + 1) {
+        let offset : vec2<f32> = vec2<f32>(
+          f32(x) * 0.00048828,
+          f32(y) * 0.00048828);
+
+          visibility = visibility + textureSampleCompare(
+          shadowMap, shadowSampler,
+          in.shadowPos.xy + offset, in.shadowPos.z - 0.007);
+      }
+  }
+  visibility = visibility / 9.0;
+
+  var lightDir = normalize(scene.lightPos - in.mesh_pos.xyz);
+  var lambertTerm = max(dot(lightDir, normalize(in.mesh_nor.xyz)), 0.0);
+  let lightingTerm = min(ambientFactor + visibility * lambertTerm, 1.0);
 
   var meshCol = vec4<f32>(in.mesh_col, 1.0);
   if (meshCol.r > 0.99 && meshCol.g > 0.99 && meshCol.b > 0.99){
     meshCol = in.color;
   }
-  var albedo = in.color * 0.3 + meshCol * 0.7;
-  return albedo + 0.5 * lambertTerm * vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  let albedo = in.color * 0.3 + meshCol * 0.7;
+  return albedo + lightingTerm * vec4<f32>(0.5);
 }

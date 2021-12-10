@@ -3,7 +3,7 @@ import { mat4, vec3 } from "gl-matrix";
 const scatterWidth = 100;
 const diskRadius = 0.5;
 const invMass = 0.5;
-const minY = 0.5;
+const minY = 0.2;
 const obstacleHeight = 3.0;
 const preferredVelocity = 1.4;
 

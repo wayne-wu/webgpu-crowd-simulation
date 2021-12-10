@@ -18,6 +18,7 @@ import headerWGSL from '../../shaders/header.compute.wgsl';
 import {loadModel, Mesh} from "../../meshes/mesh";
 import { meshDictionary } from './meshDictionary';
 import { cubeVertexArray, cubeVertexCount } from '../../meshes/cube';
+import { render } from 'react-dom';
 
 let camera : Camera;
 let aspect : number;
@@ -521,27 +522,31 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     // ------------------ Render Calls ------------------------- //
     if (bufManagerExists) {
-      const renderCommand = device.createCommandEncoder();
-      const transformationMatrix = getTransformationMatrix();
 
+      renderBuffManager.updateSceneUBO(camera, guiParams.gridOn);
+
+      const renderCommand = device.createCommandEncoder();
+      
+      const agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents1Buffer : compBuffManager.agents2Buffer;
+
+      renderBuffManager.drawCrowdShadow(device, renderCommand, agentsBuffer, compBuffManager.numAgents);
+
+      // const transformationMatrix = getTransformationMatrix();
       renderBuffManager.renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
       
-      const passEncoder = renderCommand.beginRenderPass(renderBuffManager.renderPassDescriptor);
+      const renderPass = renderCommand.beginRenderPass(renderBuffManager.renderPassDescriptor);
 
       // ----------------------- Draw ------------------------- //
-      renderBuffManager.drawPlatform(device, transformationMatrix, passEncoder, guiParams.gridOn);
-
-      const vp = getViewProjection();
-      const camPos = vec3.fromValues(camera.controls.eye[0], camera.controls.eye[1], camera.controls.eye[2]) ;
-      const agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents1Buffer : compBuffManager.agents2Buffer;
-      renderBuffManager.drawCrowd(device, vp, passEncoder, agentsBuffer, compBuffManager.numAgents, camPos);
+      renderBuffManager.drawPlatform(device, renderPass);
+      
+      renderBuffManager.drawCrowd(device, renderPass, agentsBuffer, compBuffManager.numAgents);
 
       if (simulationParams.numObstacles > 0)
-        renderBuffManager.drawObstacles(device, vp, passEncoder, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
+        renderBuffManager.drawObstacles(device, renderPass, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
 
-      passEncoder.endPass();
+      renderPass.endPass();
       device.queue.submit([renderCommand.finish()]);
     }
 
