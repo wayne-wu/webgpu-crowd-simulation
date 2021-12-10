@@ -18,7 +18,8 @@ module.exports = {
     "@typescript-eslint/no-unused-vars": "off",
     "@typescript-eslint/no-inferrable-types": "off",
     "no-var": "off",
-    "no-const": "off"
+    "no-const": "off",
+    "prefer-const": "off"
   },
   globals: {
     React: "writable"

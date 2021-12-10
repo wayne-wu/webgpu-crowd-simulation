@@ -235,7 +235,7 @@ export class RenderBufferManager {
     passEncoder.setVertexBuffer(1, this.goalVertBuffer);
     passEncoder.draw(sphereVertCount, numGoals, 0, 0);
   } 
-};
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //                         renderBufferManager Helpers                                //

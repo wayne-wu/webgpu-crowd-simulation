@@ -12,10 +12,10 @@ export const spherePosOffset = 0;
 export const sphereNorOffset = 4 * 4;
 export const sphereItemSize = 4 * 4 + // position
                               4 * 4;  // normal
-let idxArray = sphere.index.array;
+const idxArray = sphere.index.array;
 
 for (let i = 0; i < idxArray.length; i++) {
-    let idx = idxArray[i];
+    const idx = idxArray[i];
     sphereVertexArray[i * 8 + 0] = spherePosArray[idx * 3 + 0];
     sphereVertexArray[i * 8 + 1] = spherePosArray[idx * 3 + 1];
     sphereVertexArray[i * 8 + 2] = spherePosArray[idx * 3 + 2];
