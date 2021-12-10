@@ -13,10 +13,11 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
   let idx = GlobalInvocationID.x;
 
-  if (idx >= u32(sim_params.numAgents) - 2u){
+  if (idx > u32(sim_params.numAgents) - 2u){
     // the idx doesn't correspond to a valid agent
     return;
   }
+
 
   // get the agent that corresponds to this index
   var agentL = agentData.agents[idx];
@@ -27,7 +28,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     // of the relevant cell
     grid.cells[agentL.cell].start = idx;
   }
-  if (idx == u32(sim_params.numAgents) - 1u){
+  if (idx == u32(sim_params.numAgents) - 2u){
     // if this is the last index, it has to be the end
     // of the relevant cell
     grid.cells[agentR.cell].end = idx + 1u;
