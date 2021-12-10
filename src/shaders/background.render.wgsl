@@ -5,6 +5,7 @@
 [[block]] struct Uniforms {
     modelViewProjectionMatrix : mat4x4<f32>;
     gridOn : f32;
+    time: f32;
   };
 [[binding(0), group(0)]] var<uniform> uniforms : Uniforms;
   
@@ -66,7 +67,7 @@ struct VertexOutputGoal {
   fn vs_goal([[location(0)]] goalPos : vec4<f32>,
              [[location(1)]] meshPos : vec4<f32>,
              [[location(2)]] meshNor : vec4<f32>) -> VertexOutputGoal {
-
+               
     var model = mat4x4<f32>();
     model[0] = vec4<f32>(1.0, 0.0, 0.0, 0.0);
     model[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
@@ -86,7 +87,19 @@ fn fs_goal([[location(0)]] fragPosition: vec4<f32>,
   var lightDir = vec4<f32>(1.0, 1.0, 1.0, 0.0);
   var lambertTerm = dot(normalize(lightDir), normalize(fragNor));
 
-  var ambient = vec4<f32>(0.2, 0.5, 0.2, 1.0);
+  var ambient = vec4<f32>(0.2, 0.5, 0.2, 0.0);
+  var albedo = vec4<f32>(0.0, 1.0, 0.0, 1.0);
 
-  return vec4<f32>(0.0, 1.0, 0.0, 1.0) + ambient * lambertTerm;
+  // move color palette along sphere in y direction
+  var y = (fragPosition.y + 1.0) / 2.0;
+  y = fract(y + uniforms.time * 0.002);
+
+  // cosine color palette
+  var a = vec3<f32>(0.608, 0.718, 0.948);
+  var b = vec3<f32>(0.858, 0.248, 0.308);
+  var c = vec3<f32>(-1.112, 1.000, 1.000);
+  var d = vec3<f32>(0.000, 0.333, 0.667);
+  albedo = vec4<f32>(a + b*cos( 6.28318*(c*y+d) ), 1.0);
+
+  return albedo + ambient * lambertTerm;
 }

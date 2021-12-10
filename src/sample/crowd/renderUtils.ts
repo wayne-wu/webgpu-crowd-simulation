@@ -90,11 +90,6 @@ export class RenderBufferManager {
       sphereNorOffset, presentationFormat, 'line-list', 'none'
     );
 
-    // this.goalPipeline = getCrowdRenderPipeline(
-    //   this.device, crowdWGSL, 6*4, 0, 
-    //   0, 0, 0, this.mesh.itemSize, this.mesh.posOffset, 
-    //   this.mesh.uvOffset, this.mesh.colorOffset, presentationFormat);
-
     this.crowdPipeline = getCrowdRenderPipeline(
       this.device, crowdWGSL, cbm.agentInstanceSize, cbm.agentPositionOffset, 
       cbm.agentColorOffset, cbm.agentVelocityOffset, this.mesh.normalOffset, this.mesh.itemSize, this.mesh.posOffset, 
@@ -109,11 +104,10 @@ export class RenderBufferManager {
     // NOTE: Is there really no way to share the same uniform buffer across different pipelines?
     // Seems very efficient to have to redeclare pretty much the same data multiple times
     let mvpSize = 4 * 16;  // mat4
-    this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4);
+    this.platformUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4 + 1*4);
     this.crowdUniformBuffer = getUniformBuffer(this.device, mvpSize + 3*4 + 1*4);
     this.obstaclesUniformBuffer = getUniformBuffer(this.device, mvpSize);
-    //this.goalUniformBuffer = getUniformBuffer(this.device, mvpSize);
-    this.goalUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4);
+    this.goalUniformBuffer = getUniformBuffer(this.device, mvpSize + 1*4 + 1*4);
 
     this.platformBindGroup = getTexturedUniformBindGroup(this.device, this.platformPipeline, this.platformUniformBuffer, gridTexture, sampler);
     this.crowdBindGroup = getUniformBindGroup(this.device, this.crowdPipeline, this.crowdUniformBuffer);
@@ -222,13 +216,18 @@ export class RenderBufferManager {
     passEncoder.draw(cubeVertexCount, numObstacles, 0, 0);
   }
 
-  drawGoals(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, goalsBuffer: GPUBuffer, numGoals: number) {
+  drawGoals(device: GPUDevice, mvp: Float32Array, passEncoder: GPURenderPassEncoder, goalsBuffer: GPUBuffer, numGoals: number, time: number) {
     device.queue.writeBuffer(
       this.goalUniformBuffer,
       0,
       mvp.buffer,
       mvp.byteOffset,
       mvp.byteLength
+    );
+    device.queue.writeBuffer(
+      this.goalUniformBuffer,
+      mvp.byteLength + 4,
+      new Float32Array([time])
     );
     passEncoder.setPipeline(this.goalPipeline);
     passEncoder.setBindGroup(0, this.goalBindGroup);

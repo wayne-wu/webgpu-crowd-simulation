@@ -332,7 +332,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     return modelViewProjectionMatrix as Float32Array;
   }
   
+  var time = 0;
+  
   function frame() {
+    time++;
     stats.begin();
     // Sample is no longer the active page.
     if (!canvasRef.current) return;
@@ -562,7 +565,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         renderBuffManager.drawObstacles(device, vp, passEncoder, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
 
       if (compBuffManager.numGoals > 0 && simulationParams.showGoals){
-        renderBuffManager.drawGoals(device, vp, passEncoder, compBuffManager.goalsBuffer, compBuffManager.numGoals);
+        renderBuffManager.drawGoals(device, vp, passEncoder, compBuffManager.goalsBuffer, compBuffManager.numGoals, time);
       }
 
       passEncoder.endPass();
