@@ -31,9 +31,9 @@ fn vs_main(in : VertexInput) -> VertexOutput {
   let c = cos(in.rotation);
   let s = sin(in.rotation);
   var model = mat4x4<f32>();
-  model[0] = vec4<f32>(in.scale.x*c, 0.0, -s, 0.0);
+  model[0] = vec4<f32>(in.scale.x*c, 0.0, -in.scale.x*s, 0.0);
   model[1] = vec4<f32>(0.0, in.scale.y, 0.0, 0.0);
-  model[2] = vec4<f32>(s, 0.0, in.scale.z*c, 0.0);
+  model[2] = vec4<f32>(in.scale.z*s, 0.0, in.scale.z*c, 0.0);
   model[3] = vec4<f32>(in.position, 1.0);
 
   var rot = mat4x4<f32>();

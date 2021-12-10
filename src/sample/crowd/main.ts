@@ -387,8 +387,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             guiParams.resetCamera = () => resetCameraFunc(5, 10, 5);
             break;
           case TestScene.BOTTLENECK:
-            resetCameraFunc(50,50,50);
-            compBuffManager.numValidAgents = 1<<10;
+            resetCameraFunc(20,20,20);
+            compBuffManager.numValidAgents = 1<<9;
             simulationParams.numObstacles = 2;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;

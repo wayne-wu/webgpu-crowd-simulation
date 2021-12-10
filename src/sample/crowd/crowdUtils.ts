@@ -4,7 +4,7 @@ const scatterWidth = 100;
 const diskRadius = 0.5;
 const invMass = 0.5;
 const minY = 0.5;
-const obstacleHeight = 2.0;
+const obstacleHeight = 3.0;
 const preferredVelocity = 1.4;
 
 
@@ -308,7 +308,7 @@ export class ComputeBufferManager {
 
   setAgentData(
     agents : Float32Array, index : number, position : number[], color : number[], 
-    velocity : number[], speed: number, goal : number[]) {
+    velocity : number[], speed: number, goal : number[], group: number = 0) {
     const offset = this.agentInstanceSize * index / 4;
     
     agents[offset + 0] = position[0];
@@ -337,30 +337,34 @@ export class ComputeBufferManager {
     agents[offset + 20] = goal[0] - position[0];
     agents[offset + 21] = 0;
     agents[offset + 22] = goal[1] - position[1];
+
+    agents[offset + 23] = group;
   }
 
   initProximal(agents : Float32Array, obstacles: Float32Array) {
     for (let i = 0; i < this.numAgents/2; ++i) {
-      let x = Math.floor(i/10);
-      let z = i%10 + 5;
+      var x = Math.floor(i/10);
+      var z = i%10 + 5;
+      x *= 1.1;
+      z *= 1.1;
       let v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth]);
+      this.setAgentData(agents, 2*i, [0.15+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.15+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth], 1);
     }
   }
 
   initBottleneck(agents : Float32Array, obstacles: Float32Array) {
     for (let i = 0; i < this.numAgents; ++i) {
-      let x = i%20 - 10;
-      let z = Math.floor(i/20) + 10;
+      var x = 1.5*(i%10) - 8;
+      var z = 1.1*Math.floor(i/10) + 10;
       let v = 0.5;
       this.setAgentData(
         agents, i,
         [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
     }
 
-    this.setObstacleData(obstacles, 0, [25,-25], 0, [20, 20]);
-    this.setObstacleData(obstacles, 1, [-25,-25], 0, [20, 20]);
+    this.setObstacleData(obstacles, 0, [23,-25], 0, [20, 20]);
+    this.setObstacleData(obstacles, 1, [-23,-25], 0, [20, 20]);
   }
 
   initDense(agents : Float32Array, obstacles: Float32Array) {
@@ -368,8 +372,8 @@ export class ComputeBufferManager {
       let x = i%100 - 50;
       let z = Math.floor(i/100) + 10;
       let v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth]);
+      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth], 1);
     }
   }
 
@@ -379,8 +383,8 @@ export class ComputeBufferManager {
       let z = 2*Math.floor(i/100) + 10;
       let v = 0.5;
       let s = (Math.random() - 0.5) + preferredVelocity;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], s, [0, -scatterWidth]);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], s, [0, scatterWidth]);
+      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], s, [0, -scatterWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], s, [0, scatterWidth], 1);
     }
   }
 
@@ -389,8 +393,8 @@ export class ComputeBufferManager {
       let x = i%100 - 50;
       let z = Math.floor(i/100) + 10;
       let v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth]);
+      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth], 1);
     }
 
     for (let i = 0; i < obstacles.length; i++)
@@ -412,7 +416,7 @@ export class ComputeBufferManager {
       let z = radius * Math.sin(t);
       let c = [Math.random(), Math.random(), Math.random(), 1];
       let s = (Math.random() - 0.5) + preferredVelocity;
-      this.setAgentData(agents, i, [x, z], c, [0, 0], s, [-x,-z]);
+      this.setAgentData(agents, i, [x, z], c, [0, 0], s, [-x,-z], i);
     }
   }
 

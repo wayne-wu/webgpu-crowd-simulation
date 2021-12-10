@@ -6,7 +6,7 @@
 [[binding(1), group(0)]] var<storage, read> agentData_r : Agents;
 [[binding(2), group(0)]] var<storage, write> agentData_w : Agents;
 [[binding(3), group(0)]] var<storage, read> grid : Grid;
-//[[binding(4), group(0)]] var<storage, read> obstacleData : Obstacles;
+[[binding(4), group(0)]] var<storage, read> obstacleData : Obstacles;
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
@@ -87,13 +87,27 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     }
 
     if (neighborCount > 0) {
-      // Constraint averaging: Not sure if this is needed yet
       totalDx = avgCoefficient * totalDx / f32(neighborCount); 
       
       // Update position with correction
       agent.x = agent.x + totalDx;
       agent.xp = agent.xp + totalDx;
     }
+  }
+
+
+  // 4.7 Obstacles Collision
+  totalDx = vec3<f32>(0.0);
+  neighborCount = 0;
+
+  for (var j : u32 = 0u; j < arrayLength(&obstacleData.obstacles); j = j + 1u){
+    obstacle_constraint(agent, obstacleData.obstacles[j], &neighborCount, &totalDx);
+  }
+
+  if (neighborCount > 0) {
+    totalDx = avgCoefficient * totalDx / f32(neighborCount); 
+    agent.x = agent.x + totalDx;
+    agent.xp = agent.xp + totalDx;
   }
 
   // Store the new agent value
