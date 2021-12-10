@@ -314,10 +314,12 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   var computeBindGroup1 = compBuffManager.getBindGroup(false);
   var computeBindGroup2 = compBuffManager.getBindGroup(true);
 
+  var platformWidth = 50;
+
   function getTransformationMatrix() {
     const modelMatrix = mat4.create();
     mat4.identity(modelMatrix);
-    mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(50, 0.1, 50));
+    mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(platformWidth, 0.1, platformWidth));
 
     const modelViewProjectionMatrix = mat4.create();
     mat4.multiply(modelViewProjectionMatrix, camera.viewMatrix, modelMatrix);
@@ -400,6 +402,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             simulationParams.numAgents = 1<<6;
             compBuffManager.numValidAgents = 1<<6;
             simulationParams.numObstacles = 0;
+            platformWidth = 30;
             guiParams.resetCamera = () => resetCameraFunc(5, 10, 5);
             break;
           case TestScene.BOTTLENECK:
@@ -407,6 +410,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             simulationParams.numAgents = 1<<9;
             compBuffManager.numValidAgents = 1<<9;
             simulationParams.numObstacles = 2;
+            platformWidth = 70;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.DENSE:
@@ -414,6 +418,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             simulationParams.numAgents = 1<<15;
             compBuffManager.numValidAgents = 1<<15;
             simulationParams.numObstacles = 0;
+            platformWidth = 100;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.SPARSE:
@@ -421,6 +426,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             simulationParams.numAgents = 1<<12;
             compBuffManager.numValidAgents = 1<<12;
             simulationParams.numObstacles = 0;
+            platformWidth = 100;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.OBSTACLES:
@@ -428,6 +434,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             simulationParams.numAgents = 1<<10;
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numObstacles = 5;
+            platformWidth = 50;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.CIRCLE:
@@ -435,6 +442,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             simulationParams.numAgents = 1<<6;
             compBuffManager.numValidAgents = 1<<6;
             simulationParams.numObstacles = 0;
+            platformWidth = 20;
             guiParams.resetCamera = () => resetCameraFunc(5, 20, 5);
             break;
         }

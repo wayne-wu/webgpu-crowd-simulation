@@ -376,6 +376,7 @@ export class ComputeBufferManager {
   }
 
   initProximal(agents : Float32Array, obstacles: Float32Array) {
+    const planeWidth = 25; // plane width is 30 -- place 5 before that
     const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
       let x = Math.floor(i/10);
@@ -383,11 +384,11 @@ export class ComputeBufferManager {
       x *= 1.1;
       z *= 1.1;
       const v = 0.5;
-      this.setAgentData(agents, 2*i, [0.15+x, z], agentColor1, [0,-v], preferredVelocity, [0, -scatterWidth], 0);
-      this.setAgentData(agents, 2*i + 1, [-0.15+x, -z], agentColor2, [0,v], preferredVelocity, [0, scatterWidth], 1);
+      this.setAgentData(agents, 2*i, [0.15+x, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.15+x, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
     }
-    tmpGoalData.push(vec2.fromValues(0, -scatterWidth));
-    tmpGoalData.push(vec2.fromValues(0, scatterWidth));
+    tmpGoalData.push(vec2.fromValues(0, -planeWidth));
+    tmpGoalData.push(vec2.fromValues(0, planeWidth));
     this.goalData = tmpGoalData;
   }
 
@@ -409,33 +410,35 @@ export class ComputeBufferManager {
   }
 
   initDense(agents : Float32Array, obstacles: Float32Array) {
+    const planeWidth = 95;  // platform width is 100 -- place 5 before end
     const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
-      const x = i%100 - 50;
-      const z = Math.floor(i/100) + 10;
+      const x = i%200 - 100;
+      const z = Math.floor(i/200) + 10;
       const v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -scatterWidth], 0);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, scatterWidth], 1);
+      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
     }
 
-    tmpGoalData.push(vec2.fromValues(0, -scatterWidth));
-    tmpGoalData.push(vec2.fromValues(0, scatterWidth));
+    tmpGoalData.push(vec2.fromValues(0, -planeWidth));
+    tmpGoalData.push(vec2.fromValues(0, planeWidth));
     this.goalData = tmpGoalData;
   }
 
   initSparse(agents: Float32Array, obstacles: Float32Array) {
+    const planeWidth = 95;  // platform width is 100 -- place 5 before end
     const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
-      const x = 2*(i%100) - 50;
+      const x = 2*(i%100) - 2*50;
       const z = 2*Math.floor(i/100) + 10;
       const v = 0.5;
       const s = (Math.random() - 0.5) + preferredVelocity;
-      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], s, [0, -scatterWidth], 0);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], s, [0, scatterWidth], 1);
+      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], s, [0, -planeWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], s, [0, planeWidth], 1);
     }
 
-    tmpGoalData.push(vec2.fromValues(0, -scatterWidth));
-    tmpGoalData.push(vec2.fromValues(0, scatterWidth));
+    tmpGoalData.push(vec2.fromValues(0, -planeWidth));
+    tmpGoalData.push(vec2.fromValues(0, planeWidth));
     this.goalData = tmpGoalData;
   }
 
