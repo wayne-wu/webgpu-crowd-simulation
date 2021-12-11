@@ -17,6 +17,15 @@ import {
   cubeNorOffset
 } from '../../meshes/cube';
 
+import { 
+  sphereItemSize, 
+  sphereNorOffset, 
+  spherePosOffset, 
+  sphereVertCount, 
+  sphereVertexArray 
+} from '../../meshes/sphere';
+
+
 import renderWGSL from '../../shaders/background.render.wgsl';
 import crowdWGSL from '../../shaders/crowd.render.wgsl';
 import crowdShadowWGSL from '../../shaders/crowdShadow.render.wgsl';
@@ -37,11 +46,13 @@ export class RenderBufferManager {
   platformVertexBuffer    : GPUBuffer;
   obstacleVertexBuffer    : GPUBuffer;
   meshVertexBuffer        : GPUBuffer;
+  goalVertBuffer          : GPUBuffer;
 
   platformPipeline        : GPURenderPipeline;
   crowdPipeline           : GPURenderPipeline;
   crowdShadowPipeline     : GPURenderPipeline;
   obstaclesPipeline       : GPURenderPipeline;
+  goalPipeline            : GPURenderPipeline;
 
   sceneUBO                : GPUBuffer;
   platformModelUBO        : GPUBuffer;
@@ -53,6 +64,7 @@ export class RenderBufferManager {
   platformBindGroup       : GPUBindGroup;
   crowdBindGroup          : GPUBindGroup;
   obstaclesBindGroup      : GPUBindGroup;
+  goalBindGroup           : GPUBindGroup;
 
   uboBindGroupLayout      : GPUBindGroupLayout;
   platformBindGroupLayout : GPUBindGroupLayout;
@@ -67,11 +79,11 @@ export class RenderBufferManager {
   mesh                    : Mesh;
 
   constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, 
-               mesh : Mesh, gridTexture: GPUTexture, sampler) 
+               mesh : Mesh, gridTexture: GPUTexture, sampler, showGoals: boolean) 
   {
     this.device = device;
     this.mesh = mesh;
-    this.initVBOs(gridWidth);
+    this.initVBOs(gridWidth, showGoals);
     this.initBindGroupLayouts();
     this.initUBOs();
     this.initRenderPasses(presentationSize);
@@ -79,10 +91,11 @@ export class RenderBufferManager {
     this.initPipelines(presentationFormat, cbm);
   }
 
-  initVBOs(gridWidth: number) {
+  initVBOs(gridWidth: number, showGoals: boolean) {
     this.platformVertexBuffer = createVBO(this.device, platformVertexArray);
     this.obstacleVertexBuffer = createVBO(this.device, cubeVertexArray);
     this.meshVertexBuffer = createVBO(this.device, this.mesh.vertexArray);
+    this.goalVertBuffer = createVBO(this.device, new Float32Array(sphereVertexArray));
   }
 
   initBindGroupLayouts() {
@@ -187,12 +200,12 @@ export class RenderBufferManager {
       {
         // TODO: Need to find the right setting for this
         const margin = 20;
-        const left = -margin;
-        const right = margin;
-        const bottom = -margin;
-        const top = margin;
+        const left = -50;
+        const right = 20;
+        const bottom = -30;
+        const top = 30;
         const near = 1.0;
-        const far = 150.0;
+        const far = 150.0; 
         mat4.ortho(lightProjectionMatrix, left, right, bottom, top, near, far);
       }
     
@@ -200,12 +213,6 @@ export class RenderBufferManager {
       mat4.multiply(lightViewProjMatrix, lightProjectionMatrix, lightViewMatrix);
       this.device.queue.writeBuffer(this.sceneUBO, 0, lightViewProjMatrix as Float32Array);
       this.device.queue.writeBuffer(this.sceneUBO, 2 * 4 * 16, lightPosition as Float32Array);
-    }
-    {
-      const modelMatrix = mat4.create();
-      mat4.identity(modelMatrix);
-      mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(50, 0.1, 50));
-      this.device.queue.writeBuffer(this.platformModelUBO, 0, modelMatrix as Float32Array);
     }
     {
       const modelMatrix = mat4.create();
@@ -221,6 +228,7 @@ export class RenderBufferManager {
     this.initCrowdShadowPipeline(presentationFormat, cbm);
     this.initCrowdPipeline(presentationFormat, cbm);
     this.initObstaclePipeline(presentationFormat, cbm);
+    this.initGoalPipeline(presentationFormat, cbm);
   }
 
   initBindGroups(gridTexture: GPUTexture, sampler: GPUSampler) {  
@@ -261,6 +269,7 @@ export class RenderBufferManager {
     this.crowdModelBindGroup = createBindGroup(this.device, this.uboBindGroupLayout, this.crowdModelUBO);
 
     this.obstaclesBindGroup = createBindGroup(this.device, this.uboBindGroupLayout, this.sceneUBO);
+    this.goalBindGroup = createBindGroup(this.device, this.uboBindGroupLayout, this.sceneUBO);
   }
   
   initRenderPasses(presentationSize) {
@@ -509,7 +518,51 @@ export class RenderBufferManager {
     this.obstaclesPipeline = this.device.createRenderPipeline(desc);
   }
 
-  drawPlatform(device: GPUDevice, passEncoder: GPURenderPassEncoder) {
+  initGoalPipeline(presentationFormat, cbm : ComputeBufferManager) {
+    const buffers = [
+      {
+        arrayStride: 6*4,
+        stepMode: 'instance',
+        attributes: [
+          {
+            // position
+            shaderLocation: 0,
+            offset: 0,
+            format: 'float32x4',
+          },
+        ],
+      },
+      {
+        arrayStride: sphereItemSize,
+        attributes: [
+          {
+            // position
+            shaderLocation: 1,
+            offset: spherePosOffset,
+            format: 'float32x4',
+          },
+          {
+            // normal
+            shaderLocation: 2,
+            offset: sphereNorOffset,
+            format: 'float32x4',
+          }
+        ],
+      },
+    ];
+    const layout = this.device.createPipelineLayout({
+        bindGroupLayouts : [this.uboBindGroupLayout,], });
+    var desc = getPipelineDescriptor(this.device, layout, renderWGSL, 'vs_goal', 'fs_goal', 
+      buffers, presentationFormat, 'line-list', 'back');
+    this.goalPipeline = this.device.createRenderPipeline(desc);
+  }
+
+  drawPlatform(device: GPUDevice, passEncoder: GPURenderPassEncoder, platformWidth) {
+    const modelMatrix = mat4.create();
+    mat4.identity(modelMatrix);
+    mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(platformWidth, 0.1, platformWidth));
+    this.device.queue.writeBuffer(this.platformModelUBO, 0, modelMatrix as Float32Array);
+
     passEncoder.setPipeline(this.platformPipeline);
     passEncoder.setBindGroup(0, this.platformBindGroup);
     passEncoder.setBindGroup(1, this.platformModelBindGroup);
@@ -545,21 +598,37 @@ export class RenderBufferManager {
     passEncoder.draw(cubeVertexCount, numObstacles, 0, 0);
   }
 
-  updateSceneUBO(camera: Camera, gridOn: boolean){
+  drawGoals(device: GPUDevice, passEncoder: GPURenderPassEncoder, goalsBuffer: GPUBuffer, numGoals: number) {
+    passEncoder.setPipeline(this.goalPipeline);
+    passEncoder.setBindGroup(0, this.goalBindGroup);
+    passEncoder.setVertexBuffer(0, goalsBuffer);
+    passEncoder.setVertexBuffer(1, this.goalVertBuffer);
+    passEncoder.draw(sphereVertCount, numGoals, 0, 0);
+  } 
+
+  updateSceneUBO(camera: Camera, gridOn: boolean, time: number){
     const vp = mat4.create();
     mat4.multiply(vp, camera.projectionMatrix, camera.viewMatrix);
     this.device.queue.writeBuffer(
       this.sceneUBO,
+      // skip lightViewProj
       4 * 16,
       vp as Float32Array);
     this.device.queue.writeBuffer(
       this.sceneUBO,
+      // lightViewProj, camViewProj, lightPos
       2 * 4 * 16 + 3 * 4,
       new Float32Array([gridOn ? 1.0 : 0.0]));
     this.device.queue.writeBuffer(
       this.sceneUBO,
+      // lightViewProj, camViewProj, lightPos, gridOn
       2 * 4 * 16 + 4 * 4,
       new Float32Array([camera.controls.eye[0], camera.controls.eye[1], camera.controls.eye[2]]));
+    this.device.queue.writeBuffer(
+      this.sceneUBO,
+      // lightViewProj, camViewProj, lightPos, gridOn, camPos
+      2 * 4 * 16 + 4 * 4 + 3 * 4,
+      new Float32Array([time]));
   }
 }
 
@@ -583,12 +652,10 @@ const createUBO = (device: GPUDevice, size: number) => {
   return device.createBuffer({
     size: size,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });;
-};
+  });
+}
 
 const createBindGroup = (device: GPUDevice, bgl: GPUBindGroupLayout, uniformBuffer: GPUBuffer) => {
-  console.log(bgl);
-  console.log(uniformBuffer);
   const bg = device.createBindGroup({
     layout: bgl,
     entries: [

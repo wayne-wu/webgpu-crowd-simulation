@@ -1,4 +1,4 @@
-import { mat4, vec3 } from "gl-matrix";
+import { mat4, vec3, vec2 } from "gl-matrix";
 
 const scatterWidth = 100;
 const diskRadius = 0.5;
@@ -7,6 +7,8 @@ const minY = 0.2;
 const obstacleHeight = 3.0;
 const preferredVelocity = 1.4;
 
+const agentColor1 = [(117 + (100 * Math.random() - 50)) / 255.0, 4 / 255.0, (60 + (50 * Math.random() - 25)) / 255.0, 1];
+const agentColor2 = [17 / 255.0, (113 + (50 * Math.random() - 25)) / 255.0, ((Math.random() * 200 - 100) + 128) / 255.0, 1];
 
 export enum TestScene {
   PROXIMAL = "proximal",
@@ -25,6 +27,7 @@ export class ComputeBufferManager {
   numValidAgents : number; 
   numObstacles : number;
   tick : number;
+  numGoals: number;
 
   // buffer sizes
   simulationUBOBufferSize : number;
@@ -48,6 +51,8 @@ export class ComputeBufferManager {
   cellsBuffer : GPUBuffer;            // start / end indices for each cell (in pairs)
   
   obstaclesBuffer : GPUBuffer;
+  goalsBuffer : GPUBuffer;
+  goalData : Array<vec2>;            // goal positions for rendering
 
   // bind group layout
   bindGroupLayout : GPUBindGroupLayout;
@@ -60,6 +65,7 @@ export class ComputeBufferManager {
               gridWidth: number){
     this.device = device;
     this.testScene = testScene;
+    this.goalData = new Array<vec2>();
 
     this.agentPositionOffset = 0;
     this.agentColorOffset = 4 * 4;
@@ -70,6 +76,7 @@ export class ComputeBufferManager {
     
     this.numObstacles = 1;
     this.tick = 1.0;
+    this.numGoals = 0;
 
     // --- set buffer sizes ---
 
@@ -144,6 +151,8 @@ export class ComputeBufferManager {
         break;
     }
 
+    const goalsArray = this.getGoalsArray();
+
     // simulation parameter buffer
     this.simulationUBOBuffer = this.device.createBuffer({
       size: this.simulationUBOBufferSize,
@@ -180,6 +189,15 @@ export class ComputeBufferManager {
     });
     new Float32Array(this.obstaclesBuffer.getMappedRange()).set(obstacleData);
     this.obstaclesBuffer.unmap();
+
+    // goals buffer
+    this.goalsBuffer = this.device.createBuffer({
+      size: this.goalData.length * 6*4,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+      mappedAtCreation: true
+    });
+    new Float32Array(this.goalsBuffer.getMappedRange()).set(goalsArray);
+    this.goalsBuffer.unmap();
   }
 
   writeSimParams(simulationParams){
@@ -299,6 +317,20 @@ export class ComputeBufferManager {
     return computeBindGroup;
   }
 
+  getGoalsArray(){
+    const tmpGoalVertArray = [];
+    for (let i = 0; i < this.goalData.length; i++){
+      tmpGoalVertArray[i * 6 + 0] = this.goalData[i][0];
+      tmpGoalVertArray[i * 6 + 1] = 1.0;
+      tmpGoalVertArray[i * 6 + 2] = this.goalData[i][1];
+      tmpGoalVertArray[i * 6 + 3] = 1.0;
+      tmpGoalVertArray[i * 6 + 4] = 1.0;  // filler data
+      tmpGoalVertArray[i * 6 + 5] = 1.0;  // filler data
+    }
+    this.numGoals = this.goalData.length;
+    return new Float32Array(tmpGoalVertArray);
+  }
+
   setObstacleData(data : Float32Array, index : number, position : number[], rotation : number, scale : number[]) {
     const offset = this.obstacleInstanceSize * index / 4;
 
@@ -349,59 +381,78 @@ export class ComputeBufferManager {
   }
 
   initProximal(agents : Float32Array, obstacles: Float32Array) {
+    const planeWidth = 25; // plane width is 30 -- place 5 before that
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
       let x = Math.floor(i/10);
       let z = i%10 + 5;
       x *= 1.1;
       z *= 1.1;
       const v = 0.5;
-      this.setAgentData(agents, 2*i, [0.15+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth], 0);
-      this.setAgentData(agents, 2*i + 1, [-0.15+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth], 1);
+      this.setAgentData(agents, 2*i, [0.15+x, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.15+x, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
     }
+    tmpGoalData.push(vec2.fromValues(0, -planeWidth));
+    tmpGoalData.push(vec2.fromValues(0, planeWidth));
+    this.goalData = tmpGoalData;
   }
 
   initBottleneck(agents : Float32Array, obstacles: Float32Array) {
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents; ++i) {
       const x = 1.5*(i%10) - 8;
       const z = 1.1*Math.floor(i/10) + 10;
       const v = 0.5;
       this.setAgentData(
         agents, i,
-        [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth]);
+        [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -50]);
     }
+    tmpGoalData.push(vec2.fromValues(0, -50));
+    this.goalData = tmpGoalData;
 
     this.setObstacleData(obstacles, 0, [23,-25], 0, [20, 20]);
     this.setObstacleData(obstacles, 1, [-23,-25], 0, [20, 20]);
   }
 
   initDense(agents : Float32Array, obstacles: Float32Array) {
+    const planeWidth = 95;  // platform width is 100 -- place 5 before end
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
-      const x = i%100 - 50;
-      const z = Math.floor(i/100) + 10;
+      const x = i%200 - 100;
+      const z = Math.floor(i/200) + 10;
       const v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth], 0);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth], 1);
+      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
     }
+    tmpGoalData.push(vec2.fromValues(0, -planeWidth));
+    tmpGoalData.push(vec2.fromValues(0, planeWidth));
+    this.goalData = tmpGoalData;
   }
 
   initSparse(agents: Float32Array, obstacles: Float32Array) {
+    const planeWidth = 95;  // platform width is 100 -- place 5 before end
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
-      const x = 2*(i%100) - 50;
+      const x = 2*(i%100) - 2*50;
       const z = 2*Math.floor(i/100) + 10;
       const v = 0.5;
       const s = (Math.random() - 0.5) + preferredVelocity;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], s, [0, -scatterWidth], 0);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], s, [0, scatterWidth], 1);
+      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], s, [0, -planeWidth], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], s, [0, planeWidth], 1);
     }
+    tmpGoalData.push(vec2.fromValues(0, -planeWidth));
+    tmpGoalData.push(vec2.fromValues(0, planeWidth));
+    this.goalData = tmpGoalData;
   }
 
   initObstacles(agents: Float32Array, obstacles: Float32Array) {
+    const tmpGoalData = new Array<vec2>();
     for (let i = 0; i < this.numAgents/2; ++i) {
       const x = i%100 - 50;
       const z = Math.floor(i/100) + 10;
       const v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], [1,0,0,1], [0,-v], preferredVelocity, [0, -scatterWidth], 0);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], [0,0,1,1], [0,v], preferredVelocity, [0, scatterWidth], 1);
+      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -45], 0);
+      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, 45], 1);
     }
 
     for (let i = 0; i < obstacles.length; i++)
@@ -411,10 +462,14 @@ export class ComputeBufferManager {
       const rot = Math.random() * Math.PI;
       this.setObstacleData(obstacles, i, [(Math.random()-0.5)*scatterWidth,0], rot, [scale, scale]);
     }
+
+    tmpGoalData.push(vec2.fromValues(0, -45));
+    tmpGoalData.push(vec2.fromValues(0, 45));
+    this.goalData = tmpGoalData;
   }
 
   initCircle(agents: Float32Array, obstacles: Float32Array) {
-
+    const tmpGoalData = new Array<vec2>();
     const radius = this.numAgents * diskRadius / Math.PI;
     
     for(let i = 0; i < this.numAgents; i++) {
@@ -424,7 +479,9 @@ export class ComputeBufferManager {
       const c = [Math.random(), Math.random(), Math.random(), 1];
       const s = (Math.random() - 0.5) + preferredVelocity;
       this.setAgentData(agents, i, [x, z], c, [0, 0], s, [-x,-z], i);
+      tmpGoalData.push(vec2.fromValues(-x, -z));
     }
+    this.goalData = tmpGoalData;
   }
 
 }

@@ -39,16 +39,6 @@ fn vs_main([[location(0)]] position : vec4<f32>,
 }
 
 //////////////////////////////////////////////////////////////////////
-//            Fragment Shader for GridLines                         //
-////////////////////////////////////////////////////////////////////// 
-
-// [[stage(fragment)]]
-// fn fs_gridLines([[location(0)]] fragUV: vec2<f32>,
-//         [[location(1)]] fragPosition: vec4<f32>) -> [[location(0)]] vec4<f32> {
-//   return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-// }
-
-//////////////////////////////////////////////////////////////////////
 //            Fragment Shader for Platform                          //
 ////////////////////////////////////////////////////////////////////// 
 
@@ -87,8 +77,62 @@ fn fs_platform(in : VertexOutput) -> [[location(0)]] vec4<f32> {
   var albedo = vec4<f32>(1.0, 1.0, 1.0, 1.0);
   
   if (scene.gridOn > 0.99){
-    albedo = textureSample(myTexture, mySampler, in.fragUV) + 0.95;
+    albedo = textureSample(myTexture, mySampler, in.fragUV) + 0.98;
   }
 
   return 0.2*albedo + 0.8*vec4<f32>(lightingTerm * albedo.xyz, 1.0);;
+}
+
+////////////////////////////////////////////////////////////////////////
+//                       Shaders for Goals                            //
+////////////////////////////////////////////////////////////////////////
+
+struct VertexOutputGoal {
+    [[builtin(position)]] Position : vec4<f32>;
+    [[location(0)]] fragPosition: vec4<f32>;
+    [[location(1)]] fragNor : vec4<f32>;
+};
+
+[[stage(vertex)]]
+  fn vs_goal([[location(0)]] goalPos : vec4<f32>,
+             [[location(1)]] meshPos : vec4<f32>,
+             [[location(2)]] meshNor : vec4<f32>) -> VertexOutputGoal {
+
+    // Scale the goal based on distance to camera
+    var s = 0.01*distance(scene.cameraPos, goalPos.xyz);
+
+    var model = mat4x4<f32>();
+    model[0] = vec4<f32>(s, 0.0, 0.0, 0.0);
+    model[1] = vec4<f32>(0.0, s, 0.0, 0.0);
+    model[2] = vec4<f32>(0.0, 0.0, s, 0.0);
+    model[3] = vec4<f32>(goalPos[0], goalPos[1], goalPos[2], 1.0);
+
+    var output : VertexOutputGoal;
+    output.Position = scene.cameraViewProjMatrix * model * meshPos;
+    output.fragPosition = meshPos;
+    output.fragNor = meshNor;
+    return output;
+  }
+
+[[stage(fragment)]]
+fn fs_goal([[location(0)]] fragPosition: vec4<f32>,
+               [[location(1)]] fragNor : vec4<f32>) -> [[location(0)]] vec4<f32> {
+  var lightDir = vec4<f32>(1.0, 1.0, 1.0, 0.0);
+  var lambertTerm = dot(normalize(lightDir), normalize(fragNor));
+
+  var ambient = vec4<f32>(0.2, 0.5, 0.2, 0.0);
+  var albedo = vec4<f32>(0.0, 1.0, 0.0, 1.0);
+
+  // move color palette along sphere in y direction
+  var y = (fragPosition.y + 1.0) / 2.0;
+  y = fract(y + scene.time * 0.005);
+
+  // cosine color palette
+  var a = vec3<f32>(0.608, 0.718, 0.948);
+  var b = vec3<f32>(0.858, 0.248, 0.308);
+  var c = vec3<f32>(-1.112, 1.000, 1.000);
+  var d = vec3<f32>(0.000, 0.333, 0.667);
+  albedo = vec4<f32>(a + b*cos( 6.28318*(c*y+d) ), 1.0);
+
+  return albedo + ambient * lambertTerm;
 }

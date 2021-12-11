@@ -15,6 +15,7 @@ fn rand() -> f32 {
     lightPos : vec3<f32>;
     gridOn : f32;
     cameraPos : vec3<f32>;
+    time : f32;
 };
 
 [[block]] struct Model {

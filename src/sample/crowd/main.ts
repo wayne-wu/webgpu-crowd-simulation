@@ -137,6 +137,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     deltaTime: 0.02,
     numAgents: 1024,
     numObstacles : 1,
+    showGoals: true,
     avoidance: false,
     gridWidth: guiParams.gridWidth,
     testScene: TestScene.PROXIMAL,
@@ -149,7 +150,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
-  simFolder.add(simulationParams, 'numAgents', 10, 100000, 2);
+  simFolder.add(simulationParams, 'numAgents', 10, 100000, 2).listen();
+  simFolder.add(simulationParams, 'showGoals');
   simFolder.add(simulationParams, 'avoidance');
   simFolder.add(simulationParams, 'testScene', Object.values(TestScene));
   simFolder.add(simulationParams, 'resetSimulation');
@@ -227,13 +229,16 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     minFilter: 'linear',
   });
 
+  var platformWidth = 50; // global for platform width, test scenes change this
+
   let bufManagerExists = false;
   if (modelParams.model == 'Cube'){
     const mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
     mesh.scale = 0.2;
     renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
       presentationFormat, presentationSize,
-      compBuffManager, mesh, gridTexture, sampler);
+      compBuffManager, mesh, gridTexture, sampler, 
+      simulationParams.showGoals);
     bufManagerExists = true;
   }
   else{
@@ -242,7 +247,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       mesh.scale = modelData.scale;
       renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
         presentationFormat, presentationSize,
-        compBuffManager, mesh, gridTexture, sampler);
+        compBuffManager, mesh, gridTexture, sampler, 
+        simulationParams.showGoals);
       
       bufManagerExists = true;
     });
@@ -311,25 +317,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   var computeBindGroup1 = compBuffManager.getBindGroup(false);
   var computeBindGroup2 = compBuffManager.getBindGroup(true);
 
-  function getTransformationMatrix() {
-    const modelMatrix = mat4.create();
-    mat4.identity(modelMatrix);
-    mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(50, 0.1, 50));
-
-    const modelViewProjectionMatrix = mat4.create();
-    mat4.multiply(modelViewProjectionMatrix, camera.viewMatrix, modelMatrix);
-    mat4.multiply(modelViewProjectionMatrix, camera.projectionMatrix, modelViewProjectionMatrix);
-    return modelViewProjectionMatrix as Float32Array;
-  }
-
-  function getViewProjection() {
-    const modelViewProjectionMatrix = mat4.create();
-
-    mat4.multiply(modelViewProjectionMatrix, camera.projectionMatrix, camera.viewMatrix);
-    return modelViewProjectionMatrix as Float32Array;
-  }
-  
+  var time = 0;
   function frame() {
+    time++;
     stats.begin();
     // Sample is no longer the active page.
     if (!canvasRef.current) return;
@@ -349,7 +339,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         mesh.scale = 0.2;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,
-          compBuffManager, mesh, gridTexture, sampler);
+          compBuffManager, mesh, gridTexture, sampler, 
+          simulationParams.showGoals);
         bufManagerExists = true;
       } else {
       var modelData = meshDictionary[modelParams.model];
@@ -357,7 +348,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         mesh.scale = modelData.scale;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,
-          compBuffManager, mesh, gridTexture, sampler);
+          compBuffManager, mesh, gridTexture, sampler, 
+          simulationParams.showGoals);
     
         bufManagerExists = true;
       });
@@ -369,6 +361,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     //------------------ Compute Calls ------------------------ //
     {
       if (prevNumAgents != simulationParams.numAgents) {
+        // round numAgents so that it is an exponent of 2 (hash grid requires this)
+        const pow2Agents = Math.pow(2, Math.round(Math.log2(simulationParams.numAgents)));
+        simulationParams.numAgents = pow2Agents;
         // NOTE: we also reset the sim if the grid width changes
         // which is checked just above this
         prevNumAgents = simulationParams.numAgents;
@@ -383,37 +378,50 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
           case TestScene.PROXIMAL:
             resetCameraFunc(5,10,5);
             compBuffManager.numValidAgents = 1<<6;
+            simulationParams.numAgents = 1<<6;
             simulationParams.numObstacles = 0;
+            platformWidth = 30;
             guiParams.resetCamera = () => resetCameraFunc(5, 10, 5);
             break;
           case TestScene.BOTTLENECK:
             resetCameraFunc(20,20,20);
             compBuffManager.numValidAgents = 1<<9;
+            simulationParams.numAgents = 1<<9;
             simulationParams.numObstacles = 2;
+            platformWidth = 70;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.DENSE:
             resetCameraFunc(50,50,50);
+            simulationParams.numAgents = 1<<15;
             compBuffManager.numValidAgents = 1<<15;
             simulationParams.numObstacles = 0;
+            platformWidth = 100;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.SPARSE:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<12;
+            simulationParams.numAgents = 1<<12;
             simulationParams.numObstacles = 0;
+            platformWidth = 100;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.OBSTACLES:
             resetCameraFunc(50,50,50);
             compBuffManager.numValidAgents = 1<<10;
+            simulationParams.numAgents = 1<<10;
             simulationParams.numObstacles = 5;
+            platformWidth = 50;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.CIRCLE:
             resetCameraFunc(5,20,5);
             compBuffManager.numValidAgents = 1<<6;
+            simulationParams.numAgents = 1<<6;
             simulationParams.numObstacles = 0;
+            platformWidth = 20;
+            guiParams.resetCamera = () => resetCameraFunc(5, 20, 5);
             break;
         }
         resetSim = true;
@@ -523,7 +531,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     // ------------------ Render Calls ------------------------- //
     if (bufManagerExists) {
 
-      renderBuffManager.updateSceneUBO(camera, guiParams.gridOn);
+      renderBuffManager.updateSceneUBO(camera, guiParams.gridOn, time);
 
       const renderCommand = device.createCommandEncoder();
       
@@ -539,12 +547,16 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       const renderPass = renderCommand.beginRenderPass(renderBuffManager.renderPassDescriptor);
 
       // ----------------------- Draw ------------------------- //
-      renderBuffManager.drawPlatform(device, renderPass);
+      renderBuffManager.drawPlatform(device, renderPass, platformWidth);
       
       renderBuffManager.drawCrowd(device, renderPass, agentsBuffer, compBuffManager.numAgents);
 
       if (simulationParams.numObstacles > 0)
         renderBuffManager.drawObstacles(device, renderPass, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
+
+      if (compBuffManager.numGoals > 0 && simulationParams.showGoals){
+        renderBuffManager.drawGoals(device, renderPass, compBuffManager.goalsBuffer, compBuffManager.numGoals);
+      }
 
       renderPass.endPass();
       device.queue.submit([renderCommand.finish()]);
