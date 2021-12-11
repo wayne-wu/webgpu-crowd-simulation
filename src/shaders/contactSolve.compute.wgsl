@@ -98,15 +98,13 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
         }
       }
     }
-
-    if (neighborCount > 0) {
-      totalDx = avgCoefficient * totalDx / f32(neighborCount); 
-      
-      // Update position with correction
-      agent.x = agent.x + totalDx;
-      agent.xp = agent.xp + totalDx;
-    }
-
+  }
+  if (neighborCount > 0) {
+    totalDx = avgCoefficient * totalDx / f32(neighborCount); 
+    
+    // Update position with correction
+    agent.x = agent.x + totalDx;
+    agent.xp = agent.xp + totalDx;
   }
 
   //let foo = f32(grid.cells[agent.cell].end - grid.cells[agent.cell].start);
