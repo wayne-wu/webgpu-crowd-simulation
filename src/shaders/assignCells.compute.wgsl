@@ -17,6 +17,19 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
   var agent = agentData.agents[idx];
 
+  if (distance(agent.x, agent.goal) < 1.0){
+    // if we're close enough to the goal, (somewhat) smoothly place them 
+    // on the goal and set the cell to invalid so future computation largely
+    // ignores them 
+    agent.x = ((agent.x * 10.0) + agent.goal) / 11.0;
+    // -2 will signify we've hit the goal, and not just an invalid cell (-1)
+    agent.cell = -2;
+    // initiate party time
+    agent.c = rainbowCycle(sim_params.tick); 
+    agentData.agents[idx] = agent;
+    return;
+  }
+
   let gridWidth = sim_params.gridWidth;
   let gridHeight = sim_params.gridWidth;
   let cellWidth = 1000.0 / gridWidth;
@@ -33,6 +46,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
   if (cellXY.x >= i32(gridWidth) || cellXY.y >= i32(gridHeight) ||
       posCellSpace.x < 0.0 || posCellSpace.y < 0.0) {
     cellID = -1; 
+    agent.c = vec4<f32>(0.5, 0.5, 0.5, 1.0);
   }
 
   agent.cell = cellID;

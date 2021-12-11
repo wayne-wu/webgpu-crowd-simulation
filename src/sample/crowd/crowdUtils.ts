@@ -24,6 +24,7 @@ export class ComputeBufferManager {
   numAgents : number;
   numValidAgents : number; 
   numObstacles : number;
+  tick : number;
 
   // buffer sizes
   simulationUBOBufferSize : number;
@@ -68,6 +69,7 @@ export class ComputeBufferManager {
     this.numValidAgents = numAgents;
     
     this.numObstacles = 1;
+    this.tick = 1.0;
 
     // --- set buffer sizes ---
 
@@ -98,7 +100,8 @@ export class ComputeBufferManager {
       1 * 4 + // numAgents
       1 * 4 + // gridWidth
       1 * 4 + // iteration
-      3 * 4 + // padding
+      1 * 4 + // tick
+      2 * 4 + // padding
       0;
 
     this.cellInstanceSize = 
@@ -180,6 +183,8 @@ export class ComputeBufferManager {
   }
 
   writeSimParams(simulationParams){
+    this.tick++;
+    this.tick %= 1 << 15;
     this.device.queue.writeBuffer(
       this.simulationUBOBuffer,
       0,
@@ -187,7 +192,9 @@ export class ComputeBufferManager {
         simulationParams.simulate ? simulationParams.deltaTime : 0.0,
         simulationParams.avoidance,
         this.numAgents,
-        this.gridWidth
+        this.gridWidth,
+        0.0,
+        this.tick
       ])
     );
   }
