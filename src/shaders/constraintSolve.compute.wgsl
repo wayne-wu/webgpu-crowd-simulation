@@ -15,8 +15,6 @@ fn long_range_constraint(agent: Agent,
                          count: ptr<function, i32>, 
                          totalDx: ptr<function, vec3<f32>>)
 {
-  //let dt = sim_params.deltaTime;
-
   let r = agent.r + agent_j.r;
   var r_sq = r * r;
 
@@ -81,8 +79,20 @@ fn long_range_constraint(agent: Agent,
 
       // tangential relative displacement
       let d_tangent = d_vec - dot(d_vec, n)*n;
-      //dx = dx + (w * d_tangent) / 2.0;
-      dx = w * d_tangent;
+
+      // NOTE: https://github.com/tomerwei/pbd-crowd-sim/blob/master/src/crowds_cpu_orginal.cpp#L1584
+      // The author seems to be adding tangential component back to
+      // the original dx which does yield better result. (Not 100% sure why)
+      
+      // Email from Dr. Weiss:
+      // 1) The avoidance model is the same as the LR algorithm, 
+      // except that it only maintains the tangential component of collision avoidance behavior.
+      // The avoidance behavior keeps only the tangential component of the friction contact. 
+      // 2) In long range we have both tangential + normal contact vectors influencing the positional corrections. 
+      // In the avoidance avoidance behavior, only the tangential component contributes to the positional correction. 
+
+      dx = dx + w * d_tangent;
+      *count = *count + 1;
     }
 
     *totalDx = *totalDx + k * dx;
@@ -145,7 +155,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
         let dist = distance(agent.x, agent_j.x);
 
-        if (dist >= farRadius || dist < nearRadius){
+        if (dist > farRadius){
           continue;
         }
 
