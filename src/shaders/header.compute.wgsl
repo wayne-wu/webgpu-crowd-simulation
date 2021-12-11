@@ -26,6 +26,7 @@ let friction : bool = true;
   numAgents : f32;
   gridWidth : f32;
   iteration : i32;
+  tick      : f32;
 };
 
 struct Agent {
@@ -174,4 +175,16 @@ fn getBBoxCornerCells(worldX: f32,
                    backRight.y,
                    upperLeft.x,
                    upperLeft.y); 
+}
+
+// --- misc. debris ----
+fn rainbowCycle(t: f32) -> vec4<f32>{
+  let x = t * 0.025;
+  let twoPiOverThree = 3.14159 * 2.0 / 3.0;
+  let r = pow(2.0, sin(x + twoPiOverThree)) * 0.5;
+  let g = pow(2.0, sin(x - twoPiOverThree)) * 0.25;
+  let b = pow(2.0, sin(x)) * 0.25;
+
+  return vec4<f32>(r, g, b, 1.0);
+
 }

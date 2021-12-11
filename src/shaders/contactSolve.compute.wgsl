@@ -18,7 +18,6 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
   if (agent.cell < 0){
     // ignore invalid cells
-    agent.c = vec4<f32>(1.0, 0.0, 0.0, 1.0);
     agentData_w.agents[idx] = agent;
     return;
   }
