@@ -208,7 +208,7 @@ export class ComputeBufferManager {
       0,
       new Float32Array([
         simulationParams.simulate ? simulationParams.deltaTime : 0.0,
-        simulationParams.avoidance,
+        simulationParams.avoidanceModel,
         this.numAgents,
         this.gridWidth,
         0.0,

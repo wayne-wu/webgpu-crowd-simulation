@@ -107,7 +107,6 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   camera = new Camera(vec3.fromValues(50, 50, 50), vec3.fromValues(0, 0, 0));
   aspect = canvasRef.current.width / canvasRef.current.height;
-  //console.log(document.body.clientWidth);
   camera.setAspectRatio(aspect);
   camera.updateProjectionMatrix();
 
@@ -138,10 +137,11 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     numAgents: 1024,
     numObstacles : 1,
     showGoals: true,
-    avoidance: false,
+    avoidanceModel: false,
     gridWidth: guiParams.gridWidth,
     testScene: TestScene.PROXIMAL,
-    resetSimulation: () => { resetSim = true; }
+    resetSimulation: () => { resetSim = true; },
+    shadowOn: true,
   };
 
   let prevNumAgents = simulationParams.numAgents;
@@ -151,9 +151,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
   simFolder.add(simulationParams, 'numAgents', 10, 100000, 2).listen();
-  simFolder.add(simulationParams, 'showGoals');
-  simFolder.add(simulationParams, 'avoidance');
-  simFolder.add(simulationParams, 'testScene', Object.values(TestScene));
+  simFolder.add(simulationParams, 'avoidanceModel');
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
@@ -163,7 +161,12 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   let prevModel = 'Duck';
   const models = Array.from(Object.keys(meshDictionary));
   models.push('Cube');
-  gui.add(modelParams, 'model', models);
+
+  const sceneFolder = gui.addFolder("Scene");
+  sceneFolder.add(simulationParams, 'testScene', Object.values(TestScene));
+  sceneFolder.add(modelParams, 'model', models);
+  sceneFolder.add(simulationParams, 'showGoals');
+  sceneFolder.open();
 
 
   /////////////////////////////////////////////////////////////////////////
@@ -314,6 +317,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   }
 
   // get compute bind group
+  var computeBindGroup;
   var computeBindGroup1 = compBuffManager.getBindGroup(false);
   var computeBindGroup2 = compBuffManager.getBindGroup(true);
 
@@ -380,6 +384,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             compBuffManager.numValidAgents = 1<<6;
             simulationParams.numAgents = 1<<6;
             simulationParams.numObstacles = 0;
+            simulationParams.shadowOn = true;
             platformWidth = 30;
             guiParams.resetCamera = () => resetCameraFunc(5, 10, 5);
             break;
@@ -388,6 +393,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             compBuffManager.numValidAgents = 1<<9;
             simulationParams.numAgents = 1<<9;
             simulationParams.numObstacles = 2;
+            simulationParams.shadowOn = true;
             platformWidth = 63;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
@@ -396,6 +402,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             simulationParams.numAgents = 1<<15;
             compBuffManager.numValidAgents = 1<<15;
             simulationParams.numObstacles = 0;
+            simulationParams.shadowOn = false;
             platformWidth = 100;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
@@ -404,6 +411,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             compBuffManager.numValidAgents = 1<<12;
             simulationParams.numAgents = 1<<12;
             simulationParams.numObstacles = 0;
+            simulationParams.shadowOn = false;
             platformWidth = 100;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
@@ -412,6 +420,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             compBuffManager.numValidAgents = 1<<10;
             simulationParams.numAgents = 1<<10;
             simulationParams.numObstacles = 5;
+            simulationParams.shadowOn = true;
             platformWidth = 50;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
@@ -420,6 +429,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             compBuffManager.numValidAgents = 1<<6;
             simulationParams.numAgents = 1<<6;
             simulationParams.numObstacles = 0;
+            simulationParams.shadowOn = true;
             platformWidth = 20;
             guiParams.resetCamera = () => resetCameraFunc(5, 20, 5);
             break;
@@ -451,10 +461,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         resetSim = false;
       }
 
-      var computeCommand = device.createCommandEncoder();
-      var computeBindGroup = computeBindGroup1;
+      if(simulationParams.simulate) {
 
-      if (simulationParams.simulate) {
+      computeBindGroup = computeBindGroup1;
+      var computeCommand = device.createCommandEncoder();
       // write the parameters to the Uniform buffer for our compute shaders
       compBuffManager.writeSimParams(simulationParams);
 
@@ -488,7 +498,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       passEncoder.endPass();
 
       device.queue.submit([computeCommand.finish()]);
-    
+      
       
       // Stability/Contact solve will write to different buffer
       computeBindGroup = computeBindGroup2;
@@ -531,13 +541,14 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     // ------------------ Render Calls ------------------------- //
     if (bufManagerExists) {
 
-      renderBuffManager.updateSceneUBO(camera, guiParams.gridOn, time);
+      renderBuffManager.updateSceneUBO(camera, guiParams.gridOn, time, simulationParams.shadowOn);
 
       const renderCommand = device.createCommandEncoder();
       
       const agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents1Buffer : compBuffManager.agents2Buffer;
 
-      renderBuffManager.drawCrowdShadow(device, renderCommand, agentsBuffer, compBuffManager.numAgents);
+      if(simulationParams.shadowOn)
+        renderBuffManager.drawCrowdShadow(device, renderCommand, agentsBuffer, compBuffManager.numAgents);
 
       // const transformationMatrix = getTransformationMatrix();
       renderBuffManager.renderPassDescriptor.colorAttachments[0].view = context
