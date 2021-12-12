@@ -189,8 +189,11 @@ export class RenderBufferManager {
       3 * 4 +  // lightPos
       1 * 4 +  // gridOn
       3 * 4 +  // cameraPos
-      1 * 4;   // time
-
+      1 * 4 +  // time
+      1 * 4 +  // shadowOn
+      3 * 4 +  // padding
+      0;
+    
     this.sceneUBO = createUBO(this.device, sceneBufferSize);
     this.platformModelUBO = createUBO(this.device, 4 * 16);
     this.crowdModelUBO = createUBO(this.device, 4 * 16);
@@ -613,7 +616,7 @@ export class RenderBufferManager {
     passEncoder.draw(sphereVertCount, numGoals, 0, 0);
   } 
 
-  updateSceneUBO(camera: Camera, gridOn: boolean, time: number){
+  updateSceneUBO(camera: Camera, gridOn: boolean, time: number, shadowOn: boolean){
     const vp = mat4.create();
     mat4.multiply(vp, camera.projectionMatrix, camera.viewMatrix);
     this.device.queue.writeBuffer(
@@ -635,7 +638,7 @@ export class RenderBufferManager {
       this.sceneUBO,
       // lightViewProj, camViewProj, lightPos, gridOn, camPos
       2 * 4 * 16 + 4 * 4 + 3 * 4,
-      new Float32Array([time]));
+      new Float32Array([time, shadowOn ? 1.0: 0.0]));
   }
 }
 

@@ -7,8 +7,9 @@ let k_obstacle : f32 = 0.24;
 let k_shortrange : f32 = 1.0;   // paper = 1.0 [0,1]
 let k_avoid : f32 = 0.2;
 let avgCoefficient : f32 = 1.2; // paper = 1.2 [1,2]
-let farRadius : f32 = 6.0;
+// let farRadius : f32 = 6.0;   // Promoted to GUI
 let nearRadius : f32 = 2.0;
+let cohesionRadius : f32 = 5.0;
 let mu_static : f32 = 0.21;     // paper = 0.21
 let mu_kinematic : f32 = 0.15;  // papser = ?
 let ksi : f32 = 0.0385;         // paper = 0.0385
@@ -27,6 +28,7 @@ let friction : bool = true;
   gridWidth : f32;
   iteration : i32;
   tick      : f32;
+  farRadius : f32;
 };
 
 struct Agent {

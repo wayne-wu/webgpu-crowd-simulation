@@ -1,6 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Vertex shader
+// Crowd Render Pipeline
 ////////////////////////////////////////////////////////////////////////////////
+
 [[binding(0), group(0)]] var<uniform> scene : Scene;
 [[binding(0), group(1)]] var<uniform> model : Model;
 
@@ -62,13 +63,15 @@ fn vs_main(in : VertexInput) -> VertexOutput {
   out.mesh_nor = instance * model.modelMatrix * in.mesh_nor;
   out.mesh_col = in.mesh_col;
 
-  // Shadow Mapping
-  let posFromLight : vec4<f32> = scene.lightViewProjMatrix * out.mesh_pos;
+  if(scene.shadowOn > 0.99) {
+    // Shadow Mapping
+    let posFromLight : vec4<f32> = scene.lightViewProjMatrix * out.mesh_pos;
 
-  out.shadowPos = vec3<f32>(
-    posFromLight.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5, 0.5),
-    posFromLight.z
-  );
+    out.shadowPos = vec3<f32>(
+      posFromLight.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5, 0.5),
+      posFromLight.z
+    );
+  }
 
   return out;
 }
@@ -84,19 +87,22 @@ let ambientFactor : f32 = 0.2;
 [[stage(fragment)]]
 fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
 
-  var visibility : f32 = 0.0;
-  for (var y : i32 = -1 ; y <= 1 ; y = y + 1) {
-      for (var x : i32 = -1 ; x <= 1 ; x = x + 1) {
-        let offset : vec2<f32> = vec2<f32>(
-          f32(x) * 0.00048828,
-          f32(y) * 0.00048828);
+  var visibility : f32 = 1.0;
+  if(scene.shadowOn > 0.99) {
+    visibility = 0.0;
+    for (var y : i32 = -1 ; y <= 1 ; y = y + 1) {
+        for (var x : i32 = -1 ; x <= 1 ; x = x + 1) {
+          let offset : vec2<f32> = vec2<f32>(
+            f32(x) * 0.00048828,
+            f32(y) * 0.00048828);
 
-          visibility = visibility + textureSampleCompare(
-          shadowMap, shadowSampler,
-          in.shadowPos.xy + offset, in.shadowPos.z - 0.007);
-      }
+            visibility = visibility + textureSampleCompare(
+            shadowMap, shadowSampler,
+            in.shadowPos.xy + offset, in.shadowPos.z - 0.007);
+        }
+    }
+    visibility = visibility / 9.0;
   }
-  visibility = visibility / 9.0;
 
   var lightDir = normalize(scene.lightPos - in.mesh_pos.xyz);
   var lambertTerm = max(dot(lightDir, normalize(in.mesh_nor.xyz)), 0.0);

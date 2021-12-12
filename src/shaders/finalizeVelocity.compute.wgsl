@@ -117,7 +117,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
                                        agent.x.z,
                                        gridWidth,
                                        cellWidth,
-                                       farRadius);
+                                       cohesionRadius);
 
   let minX = bboxCorners[0];
   let minY = bboxCorners[1];
@@ -151,7 +151,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
         }
         
         var d = distance(agent.xp, neighbor.xp);
-        if (d > farRadius){
+        if (d > cohesionRadius){
           continue;
         }
         var w = getW(d*d);

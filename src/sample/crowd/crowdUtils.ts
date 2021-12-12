@@ -108,7 +108,8 @@ export class ComputeBufferManager {
       1 * 4 + // gridWidth
       1 * 4 + // iteration
       1 * 4 + // tick
-      2 * 4 + // padding
+      1 * 4 + // LR radius
+      1 * 4 + // padding
       0;
 
     this.cellInstanceSize = 
@@ -208,11 +209,12 @@ export class ComputeBufferManager {
       0,
       new Float32Array([
         simulationParams.simulate ? simulationParams.deltaTime : 0.0,
-        simulationParams.avoidance,
+        simulationParams.avoidanceModel,
         this.numAgents,
         this.gridWidth,
         0.0,
-        this.tick
+        this.tick,
+        simulationParams.lookAhead,
       ])
     );
   }
