@@ -77,7 +77,7 @@ fn fs_platform(in : VertexOutput) -> [[location(0)]] vec4<f32> {
   var albedo = vec4<f32>(1.0, 1.0, 1.0, 1.0);
   
   if (scene.gridOn > 0.99){
-    albedo = textureSample(myTexture, mySampler, in.fragUV) + 0.98;
+    albedo = textureSample(myTexture, mySampler, in.fragUV) + 1.4;
   }
 
   return 0.2*albedo + 0.8*vec4<f32>(lightingTerm * albedo.xyz, 1.0);;
