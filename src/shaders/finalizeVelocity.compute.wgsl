@@ -69,9 +69,6 @@ fn obstacle_avoidance(agent: Agent, obstacle: Obstacle) -> vec3<f32>
 
   if (t_min < 1.0) { 
     t_min = t_min * tObstacle;  // remap t_min to 0 to tObstacle
-    
-    //if(dot(v.xz, n_min) > 0.0) { n_min = -n_min; }  // flip the normal direction
-    //var n = vec3<f32>(n_min.x, 0.0, n_min.y);  // contact normal
 
     // Use the radial normal as the contact normal so that there's some tangential velocity
     var n = normalize((agent.xp + t_min * v) - obstacle.pos);
@@ -120,7 +117,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
                                        agent.x.z,
                                        gridWidth,
                                        cellWidth,
-                                       nearRadius);
+                                       farRadius);
 
   let minX = bboxCorners[0];
   let minY = bboxCorners[1];
@@ -153,8 +150,8 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
           continue;
         }
         
-        var d = distance(agent.xp, neighbor.xp);  // Should this be xp or x?
-        if (d >= nearRadius){
+        var d = distance(agent.xp, neighbor.xp);
+        if (d > farRadius){
           continue;
         }
         var w = getW(d*d);

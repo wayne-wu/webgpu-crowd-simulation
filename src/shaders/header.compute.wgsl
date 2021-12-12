@@ -2,12 +2,12 @@
 let eps : f32 = 0.0001;
 let t0 : f32 = 20.0;            // paper = 20
 let tObstacle : f32 = 20.0;
-let k_longrange : f32 = 0.20;   // paper = 0.24 [0-1]
+let k_longrange : f32 = 0.15;   // paper = 0.24 [0-1]
 let k_obstacle : f32 = 0.24;
 let k_shortrange : f32 = 1.0;   // paper = 1.0 [0,1]
 let k_avoid : f32 = 0.2;
 let avgCoefficient : f32 = 1.2; // paper = 1.2 [1,2]
-let farRadius : f32 = 5.0;
+let farRadius : f32 = 6.0;
 let nearRadius : f32 = 2.0;
 let mu_static : f32 = 0.21;     // paper = 0.21
 let mu_kinematic : f32 = 0.15;  // papser = ?

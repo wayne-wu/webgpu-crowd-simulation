@@ -183,7 +183,14 @@ export class RenderBufferManager {
 
   initUBOs() {
     // Scene UBO
-    const sceneBufferSize = 4 * 16 + 4 * 16 + 3 * 4 + 1 * 4 + 3 * 4 + 1 * 4;
+    const sceneBufferSize = 
+      4 * 16 + // lightViewProjMatrix
+      4 * 16 + // cameraViewProjMatrix
+      3 * 4 +  // lightPos
+      1 * 4 +  // gridOn
+      3 * 4 +  // cameraPos
+      1 * 4;   // time
+
     this.sceneUBO = createUBO(this.device, sceneBufferSize);
     this.platformModelUBO = createUBO(this.device, 4 * 16);
     this.crowdModelUBO = createUBO(this.device, 4 * 16);
@@ -204,7 +211,7 @@ export class RenderBufferManager {
         const right = 50;
         const bottom = -20;
         const top = 20;
-        const near = 20.0;
+        const near = 30.0;
         const far = 245.0; 
         mat4.ortho(lightProjectionMatrix, left, right, bottom, top, near, far);
       }

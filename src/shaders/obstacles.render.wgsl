@@ -53,7 +53,6 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 ////////////////////////////////////////////////////////////////////////////////
 [[stage(fragment)]]
 fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
-  //var lightDir = vec4<f32>(-1.0, 0.5, -1.0, 0.0);
   var lightDir = normalize(scene.lightPos - in.fragPos.xyz);
   var lambertTerm = dot(normalize(lightDir), normalize(in.normal.xyz));
   var lightColor = vec4<f32>(1.0, 1.0, 1.0, 1.0);

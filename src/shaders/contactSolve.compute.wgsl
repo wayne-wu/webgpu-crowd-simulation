@@ -62,7 +62,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
         var n = agent.xp - agent_j.xp;
         let d = length(n);
-        if (d >= nearRadius){
+        if (d > nearRadius){
           continue;
         }
 
@@ -105,13 +105,6 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     agent.x = agent.x + totalDx;
     agent.xp = agent.xp + totalDx;
   }
-
-  //let foo = f32(grid.cells[agent.cell].end - grid.cells[agent.cell].start);
-  //let foo = worldSpacePosToCellSpace(agent.x.x, agent.x.z, gridWidth, cellWidth);
-  //let foo = cellSpaceToCell2d(500.0, 500.0, cellWidth);
-  //let foo = worldSpacePosToCell2d(8.0, 8.0, gridWidth, cellWidth);
-  //let foo = maxY - minY;
-  //agent.c = vec4<f32>(f32(neighborCount)/4.0, 0.0, 0.0, 1.0);
 
   // 4.7 Obstacles Collision
   totalDx = vec3<f32>(0.0);

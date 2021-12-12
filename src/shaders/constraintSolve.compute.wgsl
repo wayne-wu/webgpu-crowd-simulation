@@ -168,10 +168,6 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
     agent.xp = agent.xp + avgCoefficient * totalDx / f32(neighborCount);
   }
 
-  // TODO remove
-  //let foo = f32(neighborCount) / 4.0; 
-  //agent.c.z = foo;
-
   // 4.7 Obstacles Collision
   totalDx = vec3<f32>(0.0);
   neighborCount = 0;
