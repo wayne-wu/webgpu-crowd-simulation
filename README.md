@@ -42,16 +42,19 @@ The constraint will predict the position of neighboring agents at a specified fu
 As shown in the image below, the agents start reacting before they are even close to colliding. 
 User can tweak the **lookAhead** parameter to specify how far ahead to an agent should look ahead for long range collision.
 
-![Long Range](img/longrange.gif)
+lookAhead = 6         | lookAhead = 12                         
+:--------------------:|:------------------:
+![](img/longrange_t6.gif)        |![](img/longrange_t12.gif)   
 
 ### Long Range Collision w/ Avoidance Model
 The paper introduces a novel addition to the long range collision constraint that prevents agents from being pushed back, typically in a dense crowd.
 The avoidance model considers only the tangential component of the position correction, 
 thus removing/reducing the correction along the contact normal (which can push the agent back if two agents are walking towards each other).
 
-TODO: GIFs of LR vs Avoidance (Proximal)
-
-TODO: GIFs of LR vs Avoidance (Dense)
+Scene         | LR                 |  LR w/ Avoidance                 
+:------------:|:------------------:|:-------------------------:
+Proximal      |![](img/proximal_longrange.gif)   |  ![](img/proximal_avoidance.gif)     
+Dense         |![](img/dense_longrange.gif)   |  ![](img/dense_avoidance.gif)
 
 ### Frictional Contact
 
@@ -70,7 +73,9 @@ we implement an obstacle avoidance model based on [OpenSteer](http://opensteer.s
 This affects the velocity directly in the final stage (similar to cohesion) instead of correcting the position using constraint projection.
 While this approach is not specifically outlined in the paper, we suspect the author having something similar based on the result produced.
 
-![Obstacle Avoidance](img/obstacle_example.gif)
+Obstacles         | Bottleneck                         
+:----------------:|:------------------:
+![](img/obstacles.gif)        |![](img/bottleneck.gif)    
 
 ### Parameters Tuning
 The author has kindly provided the parameters used in the paper. Using it as a starting point has given us a reasonable result.
