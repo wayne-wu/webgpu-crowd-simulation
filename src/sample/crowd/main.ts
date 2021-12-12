@@ -122,7 +122,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   };
 
   const sceneParams = {
-    scene: TestScene.PROXIMAL,
+    scene: TestScene.DISPERSED,
     model: 'Duck',
     showGoals: true,
     shadowOn: true,
@@ -433,6 +433,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             break;
           case TestScene.CIRCLE:
             setTestScene(vec3.fromValues(5, 20, 5), false, 6, 20, 0, true);
+            break;
+          case TestScene.DISPERSED:
+            setTestScene(vec3.fromValues(0, 60, 0), false, 11, 100, 0, false);
             break;
         }
         resetSim = true;
