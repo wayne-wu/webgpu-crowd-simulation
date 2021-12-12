@@ -166,6 +166,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   sceneFolder.add(sceneParams, 'scene', Object.values(TestScene));
   sceneFolder.add(sceneParams, 'model', models);
   sceneFolder.add(sceneParams, 'showGoals');
+  sceneFolder.add(sceneParams, 'shadowOn');
   sceneFolder.add(sceneParams, 'total agents');
   sceneFolder.open();
   
@@ -178,7 +179,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   simFolder.open();
 
   // manually set text for total number of agents 
-  const totalAgentsDOM = gui.__folders["Scene"].__controllers[3].domElement;
+  const totalAgentsDOM = gui.__folders["Scene"].__controllers[4].domElement;
   totalAgentsDOM.innerHTML = totalAgentsDOM.innerHTML.substr(0, totalAgentsDOM.innerHTML.length - 1) + "disabled=\"true\">";
   totalAgentsDOM.innerText = "1024";
 
@@ -341,7 +342,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     // if agent slider exists and this scene doesn't support it, remove
     if (!displayAgentSlider && numAgentsSliderDisplayed) {
-      sceneFolder.remove(gui.__folders["Scene"].__controllers[4]);
+      sceneFolder.remove(gui.__folders["Scene"].__controllers[5]);
       numAgentsSliderDisplayed = false;
     }
     // if agent slider is supported and it doesn't exist, add it
