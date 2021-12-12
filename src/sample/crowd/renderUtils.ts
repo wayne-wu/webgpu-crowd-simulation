@@ -192,7 +192,7 @@ export class RenderBufferManager {
     {
       const upVector = vec3.fromValues(0, 1, 0);
       const origin = vec3.fromValues(0, 0, 0);  
-      const lightPosition = vec3.fromValues(50, 50, -50);
+      const lightPosition = vec3.fromValues(110, 50, -110);
       const lightViewMatrix = mat4.create();
       mat4.lookAt(lightViewMatrix, lightPosition, origin, upVector);
     
@@ -201,11 +201,11 @@ export class RenderBufferManager {
         // TODO: Need to find the right setting for this
         const margin = 20;
         const left = -50;
-        const right = 20;
-        const bottom = -30;
-        const top = 30;
-        const near = 1.0;
-        const far = 150.0; 
+        const right = 50;
+        const bottom = -20;
+        const top = 20;
+        const near = 20.0;
+        const far = 245.0; 
         mat4.ortho(lightProjectionMatrix, left, right, bottom, top, near, far);
       }
     

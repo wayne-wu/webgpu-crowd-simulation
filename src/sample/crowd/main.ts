@@ -388,7 +388,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             compBuffManager.numValidAgents = 1<<9;
             simulationParams.numAgents = 1<<9;
             simulationParams.numObstacles = 2;
-            platformWidth = 70;
+            platformWidth = 63;
             guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
             break;
           case TestScene.DENSE:
