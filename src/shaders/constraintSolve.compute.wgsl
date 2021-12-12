@@ -126,7 +126,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
                                        agent.x.z,
                                        gridWidth,
                                        cellWidth,
-                                       farRadius);
+                                       sim_params.farRadius);
 
   let minX = bboxCorners[0];
   let minY = bboxCorners[1];
@@ -155,7 +155,7 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
 
         let dist = distance(agent.x, agent_j.x);
 
-        if (dist > farRadius){
+        if (dist > sim_params.farRadius){
           continue;
         }
 

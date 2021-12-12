@@ -137,6 +137,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     numAgents: 1024,
     numObstacles : 1,
     showGoals: true,
+    lookAhead : 6.0,
     avoidanceModel: false,
     gridWidth: guiParams.gridWidth,
     testScene: TestScene.PROXIMAL,
@@ -151,6 +152,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
   simFolder.add(simulationParams, 'numAgents', 10, 100000, 2).listen();
+  simFolder.add(simulationParams, 'lookAhead', 3.0, 15.0, 1.0);
   simFolder.add(simulationParams, 'avoidanceModel');
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
