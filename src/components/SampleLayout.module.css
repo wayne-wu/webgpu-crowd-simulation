@@ -66,3 +66,9 @@ nav.sourceFileNav li a[data-active=true] {
 .title {
   margin-left: 20px;
 }
+
+/* -------------------- Non-WebGPU-samples CSS ---------------------- */
+.slider-fg :disabled {
+  color: red !important;
+  background-color: red !important;
+}

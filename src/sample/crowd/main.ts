@@ -114,61 +114,74 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //                        GUI Setup                                   //
   ////////////////////////////////////////////////////////////////////////
   
+  // GUI PARAMETERS ------------------------------------------------------
   const guiParams = {
     gridWidth: 200,
     resetCamera: resetCameraFunc,
     gridOn: true
   };
 
-  let prevGridWidth = guiParams.gridWidth;
-  resetSim = true;
-
-  const gridFolder = gui.addFolder("Grid");
-  gridFolder.add(guiParams, 'gridWidth', 1, 5000, 1);
-  gridFolder.add(guiParams, 'gridOn');
-  gridFolder.open();
-  const camFolder = gui.addFolder("Camera");
-  camFolder.add(guiParams, 'resetCamera');
-  camFolder.open();
+  const sceneParams = {
+    scene: TestScene.PROXIMAL,
+    model: 'Duck',
+    showGoals: true,
+    shadowOn: true,
+    'total agents': "", // dummy, autofilled later
+    'agent selector (2^x)': 10
+  }
 
   const simulationParams = {
     simulate: true,
     deltaTime: 0.02,
-    numAgents: 1024,
     numObstacles : 1,
-    showGoals: true,
-    lookAhead : 6.0,
     avoidanceModel: false,
+    lookAhead : 6.0,
     gridWidth: guiParams.gridWidth,
-    testScene: TestScene.PROXIMAL,
-    resetSimulation: () => { resetSim = true; },
-    shadowOn: true,
+    resetSimulation: () => { resetSim = true; }
   };
 
-  let prevNumAgents = simulationParams.numAgents;
+  // GUI GLOBALS ------------------------------------------------------------
+  let prevGridWidth = guiParams.gridWidth;
+  let prevNumAgents = sceneParams['agent selector (2^x)'];
   let prevTestScene = TestScene.DENSE;
+  let prevModel = 'Duck';
+  // default don't display slider to select number of agents -- will re-add if scene requires
+  let numAgentsSliderDisplayed = false;
+  resetSim = true;
+
+  // GUI ELEMENTS -----------------------------------------------------------
+  const gridFolder = gui.addFolder("Grid");
+  gridFolder.add(guiParams, 'gridWidth', 1, 5000, 1);
+  gridFolder.add(guiParams, 'gridOn');
+  gridFolder.open();
+
+  const camFolder = gui.addFolder("Camera");
+  camFolder.add(guiParams, 'resetCamera');
+  camFolder.open();
+
+  const models = Array.from(Object.keys(meshDictionary));
+  models.push('Cube');
+
+  const sceneFolder = gui.addFolder("Scene");
+  sceneFolder.add(sceneParams, 'scene', Object.values(TestScene));
+  sceneFolder.add(sceneParams, 'model', models);
+  sceneFolder.add(sceneParams, 'showGoals');
+  sceneFolder.add(sceneParams, 'shadowOn');
+  sceneFolder.add(sceneParams, 'total agents');
+  sceneFolder.open();
   
   const simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
-  simFolder.add(simulationParams, 'numAgents', 10, 100000, 2).listen();
   simFolder.add(simulationParams, 'lookAhead', 3.0, 15.0, 1.0);
   simFolder.add(simulationParams, 'avoidanceModel');
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
 
-  const modelParams = {
-    model: 'Duck'
-  }
-  let prevModel = 'Duck';
-  const models = Array.from(Object.keys(meshDictionary));
-  models.push('Cube');
-
-  const sceneFolder = gui.addFolder("Scene");
-  sceneFolder.add(simulationParams, 'testScene', Object.values(TestScene));
-  sceneFolder.add(modelParams, 'model', models);
-  sceneFolder.add(simulationParams, 'showGoals');
-  sceneFolder.open();
+  // manually set text for total number of agents 
+  const totalAgentsDOM = gui.__folders["Scene"].__controllers[4].domElement;
+  totalAgentsDOM.innerHTML = totalAgentsDOM.innerHTML.substr(0, totalAgentsDOM.innerHTML.length - 1) + "disabled=\"true\">";
+  totalAgentsDOM.innerText = "1024";
 
 
   /////////////////////////////////////////////////////////////////////////
@@ -198,8 +211,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //                     Compute Buffer Setup                            //
   /////////////////////////////////////////////////////////////////////////
   const compBuffManager = new ComputeBufferManager(device,
-                                                 simulationParams.testScene,
-                                                 simulationParams.numAgents,
+                                                 sceneParams.scene,
+                                                 sceneParams['agent selector (2^x)'],
                                                  simulationParams.gridWidth);
 
   //////////////////////////////////////////////////////////////////////////
@@ -237,23 +250,23 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   var platformWidth = 50; // global for platform width, test scenes change this
 
   let bufManagerExists = false;
-  if (modelParams.model == 'Cube'){
+  if (sceneParams.model == 'Cube'){
     const mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
     mesh.scale = 0.2;
     renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
       presentationFormat, presentationSize,
       compBuffManager, mesh, gridTexture, sampler, 
-      simulationParams.showGoals);
+      sceneParams.showGoals);
     bufManagerExists = true;
   }
   else{
-    const modelData = meshDictionary[modelParams.model];
+    const modelData = meshDictionary[sceneParams.model];
     loadModel(modelData.filename, device).then((mesh : Mesh) => {
       mesh.scale = modelData.scale;
       renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
         presentationFormat, presentationSize,
         compBuffManager, mesh, gridTexture, sampler, 
-        simulationParams.showGoals);
+        sceneParams.showGoals);
       
       bufManagerExists = true;
     });
@@ -318,6 +331,30 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     }
   }
 
+  function setTestScene(camPos: vec3, displayAgentSlider: boolean, numAgents: number, 
+                        scenePlatformWidth: number, numObstacles: number, shadowOn: boolean){
+    resetCameraFunc(camPos[0], camPos[1], camPos[2]); // set scene's camera position
+    compBuffManager.numValidAgents = 1<<numAgents;    // number of agents to use in simulation
+    sceneParams['agent selector (2^x)'] = numAgents;  // number of agents displayed in GUI
+    platformWidth = scenePlatformWidth;               // size of the platform
+    simulationParams.numObstacles = numObstacles;     // number of obstacles (used in compBufferManager, not gui)
+    sceneParams.shadowOn = shadowOn;                      // display shadows on chosen scene
+
+    // if agent slider exists and this scene doesn't support it, remove
+    if (!displayAgentSlider && numAgentsSliderDisplayed) {
+      sceneFolder.remove(gui.__folders["Scene"].__controllers[5]);
+      numAgentsSliderDisplayed = false;
+    }
+    // if agent slider is supported and it doesn't exist, add it
+    else if (displayAgentSlider && !numAgentsSliderDisplayed) {
+      sceneFolder.add(sceneParams, 'agent selector (2^x)', 1, 20, 1).listen();
+      numAgentsSliderDisplayed = true;
+    }
+    
+    // set camera reset function used in GUI (reset to this scene's default camera position)
+    guiParams.resetCamera = () => resetCameraFunc(camPos[0], camPos[1], camPos[2]);
+  }
+
   // get compute bind group
   var computeBindGroup;
   var computeBindGroup1 = compBuffManager.getBindGroup(false);
@@ -337,25 +374,25 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       prevGridWidth = guiParams.gridWidth;
     }
 
-    if (prevModel != modelParams.model) {
+    if (prevModel != sceneParams.model) {
       bufManagerExists = false;
-      prevModel = modelParams.model;
-      if (modelParams.model == 'Cube'){
+      prevModel = sceneParams.model;
+      if (sceneParams.model == 'Cube'){
         const mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
         mesh.scale = 0.2;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,
           compBuffManager, mesh, gridTexture, sampler, 
-          simulationParams.showGoals);
+          sceneParams.showGoals);
         bufManagerExists = true;
       } else {
-      var modelData = meshDictionary[modelParams.model];
+      var modelData = meshDictionary[sceneParams.model];
       loadModel(modelData.filename, device).then((mesh : Mesh) => {
         mesh.scale = modelData.scale;
         renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
           presentationFormat, presentationSize,
           compBuffManager, mesh, gridTexture, sampler, 
-          simulationParams.showGoals);
+          sceneParams.showGoals);
     
         bufManagerExists = true;
       });
@@ -366,74 +403,36 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     //------------------ Compute Calls ------------------------ //
     {
-      if (prevNumAgents != simulationParams.numAgents) {
-        // round numAgents so that it is an exponent of 2 (hash grid requires this)
-        const pow2Agents = Math.pow(2, Math.round(Math.log2(simulationParams.numAgents)));
-        simulationParams.numAgents = pow2Agents;
+      if (prevNumAgents != sceneParams['agent selector (2^x)']) {
         // NOTE: we also reset the sim if the grid width changes
         // which is checked just above this
-        prevNumAgents = simulationParams.numAgents;
+        prevNumAgents = sceneParams['agent selector (2^x)'];
+        totalAgentsDOM.innerText = Math.pow(2, prevNumAgents) + "";
         // set reset sim to true so that simulation starts over
         // and agents are redistributed
         resetSim = true;
       }
 
-      if (prevTestScene != simulationParams.testScene) {
-        prevTestScene = simulationParams.testScene;
-        switch(simulationParams.testScene) {
+      if (prevTestScene != sceneParams.scene) {
+        prevTestScene = sceneParams.scene;
+        switch(sceneParams.scene) {
           case TestScene.PROXIMAL:
-            resetCameraFunc(5,10,5);
-            compBuffManager.numValidAgents = 1<<6;
-            simulationParams.numAgents = 1<<6;
-            simulationParams.numObstacles = 0;
-            simulationParams.shadowOn = true;
-            platformWidth = 30;
-            guiParams.resetCamera = () => resetCameraFunc(5, 10, 5);
+            setTestScene(vec3.fromValues(5, 10, 5), false, 6, 30, 0, true);
             break;
           case TestScene.BOTTLENECK:
-            resetCameraFunc(20,20,20);
-            compBuffManager.numValidAgents = 1<<9;
-            simulationParams.numAgents = 1<<9;
-            simulationParams.numObstacles = 2;
-            simulationParams.shadowOn = true;
-            platformWidth = 63;
-            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
+            setTestScene(vec3.fromValues(20, 20, 20), false, 9, 63, 2, true);
             break;
           case TestScene.DENSE:
-            resetCameraFunc(50,50,50);
-            simulationParams.numAgents = 1<<15;
-            compBuffManager.numValidAgents = 1<<15;
-            simulationParams.numObstacles = 0;
-            simulationParams.shadowOn = false;
-            platformWidth = 100;
-            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
+            setTestScene(vec3.fromValues(50, 50, 50), true, 15, 100, 0, false);
             break;
           case TestScene.SPARSE:
-            resetCameraFunc(50,50,50);
-            compBuffManager.numValidAgents = 1<<12;
-            simulationParams.numAgents = 1<<12;
-            simulationParams.numObstacles = 0;
-            simulationParams.shadowOn = false;
-            platformWidth = 100;
-            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
+            setTestScene(vec3.fromValues(50, 50, 50), true, 12, 100, 0, false);
             break;
           case TestScene.OBSTACLES:
-            resetCameraFunc(50,50,50);
-            compBuffManager.numValidAgents = 1<<10;
-            simulationParams.numAgents = 1<<10;
-            simulationParams.numObstacles = 5;
-            simulationParams.shadowOn = true;
-            platformWidth = 50;
-            guiParams.resetCamera = () => resetCameraFunc(50, 50, 50);
+            setTestScene(vec3.fromValues(50, 50, 50), false, 10, 50, 5, true);
             break;
           case TestScene.CIRCLE:
-            resetCameraFunc(5,20,5);
-            compBuffManager.numValidAgents = 1<<6;
-            simulationParams.numAgents = 1<<6;
-            simulationParams.numObstacles = 0;
-            simulationParams.shadowOn = true;
-            platformWidth = 20;
-            guiParams.resetCamera = () => resetCameraFunc(5, 20, 5);
+            setTestScene(vec3.fromValues(5, 20, 5), false, 6, 20, 0, true);
             break;
         }
         resetSim = true;
@@ -441,7 +440,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       // recompute agent buffer if resetSim button pressed
       if (resetSim) {
-        compBuffManager.testScene = simulationParams.testScene;
+        compBuffManager.testScene = sceneParams.scene;
         //compBuffManager.numValidAgents = simulationParams.numAgents;
         compBuffManager.gridWidth = simulationParams.gridWidth;
 
@@ -543,13 +542,13 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     // ------------------ Render Calls ------------------------- //
     if (bufManagerExists) {
 
-      renderBuffManager.updateSceneUBO(camera, guiParams.gridOn, time, simulationParams.shadowOn);
+      renderBuffManager.updateSceneUBO(camera, guiParams.gridOn, time, sceneParams.shadowOn);
 
       const renderCommand = device.createCommandEncoder();
       
       const agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents1Buffer : compBuffManager.agents2Buffer;
 
-      if(simulationParams.shadowOn)
+      if(sceneParams.shadowOn)
         renderBuffManager.drawCrowdShadow(device, renderCommand, agentsBuffer, compBuffManager.numAgents);
 
       // const transformationMatrix = getTransformationMatrix();
@@ -567,7 +566,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       if (simulationParams.numObstacles > 0)
         renderBuffManager.drawObstacles(device, renderPass, compBuffManager.obstaclesBuffer, compBuffManager.numObstacles);
 
-      if (compBuffManager.numGoals > 0 && simulationParams.showGoals){
+      if (compBuffManager.numGoals > 0 && sceneParams.showGoals){
         renderBuffManager.drawGoals(device, renderPass, compBuffManager.goalsBuffer, compBuffManager.numGoals);
       }
 
