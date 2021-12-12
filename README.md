@@ -4,7 +4,7 @@
 
 by [Ashley Alexander-Lee](), [Matt Elser](), and [Wayne Wu](https://www.wuwayne.com/).
 
-[**Check it out here! (WebGPU Required)**](https://www.wuwayne.com/webgpu-crowd-simulation/)
+[**Check it out live! (WebGPU Required)**](https://www.wuwayne.com/webgpu-crowd-simulation/)
 
 <img width="974" alt="Screen Shot 2021-12-12 at 11 57 46 AM" src="https://user-images.githubusercontent.com/77313916/145721748-dc58ae6a-2659-462c-9ea9-d2c527b6714f.png">
 
@@ -90,9 +90,12 @@ Dense         |![](img/dense_longrange.gif)   |  ![](img/dense_avoidance.gif)
 ### Frictional Contact
 
 ### Cohesion
-Cohesion is added so that agents in the same group will tend to follow each other thus creating smoother motions.
+Cohesion is added so that agents within the same group will tend to follow each other thus creating smoother packed motions.
+When cohesion is **off**, it is more likely to see individual agents wander off alone as shown below.
 
-![cohesion](img/cohesion_debug.gif)
+Debug                        | Cohesion OFF         | Cohesion ON
+:---------------------------:|:--------------------:|:----------------------
+![](img/cohesion_debug.gif)  |![](img/nocohesion.gif) | ![](img/cohesion.gif)
 
 ### Obstacles Collision and Avoidance
 To add complexity to the scene, we support box-shaped obstacles in our implmentation.
