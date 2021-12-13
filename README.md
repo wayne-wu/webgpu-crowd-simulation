@@ -171,8 +171,8 @@ Sparse            | Obstacles
 ![](img/top_sparse.gif)        |![](img/top_obstacles.gif)    
 
 # Additional Performance Notes
-![](img/numAgentsFPS.png)
-![](img/numVertsFPS.png)
+![](img/NumAgentsFPS.png)
+![](img/NumVertsFPS.png)
 
 # Future Work
 * Animation & Skinning
