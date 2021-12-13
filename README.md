@@ -2,7 +2,7 @@
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Final Project**
 
-by [Ashley Alexander-Lee](https://asalexanderlee.myportfolio.com/), [Matt Elser](), and [Wayne Wu](https://www.wuwayne.com/).
+by [Ashley Alexander-Lee](https://asalexanderlee.myportfolio.com/), [Matt Elser](https://www.linkedin.com/in/mattelser/), and [Wayne Wu](https://www.wuwayne.com/).
 
 [**Check it out live! (WebGPU Required)**](https://www.wuwayne.com/webgpu-crowd-simulation/)
 
@@ -189,6 +189,7 @@ References
 - [dat-gui](https://github.com/dataarts/dat.gui) for gui controls
 - WebGPU [shadow mapping example](https://austin-eng.com/webgpu-samples/samples/shadowMapping) by Austin Eng
 - WebGPU [documentation](https://www.w3.org/TR/webgpu/)
+- Bitonic Sort [wikipedia on bitonic sort](https://en.wikipedia.org/wiki/Bitonic_sorter)
 
 Bloopers
 ========
