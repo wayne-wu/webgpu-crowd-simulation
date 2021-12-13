@@ -80,6 +80,8 @@ function fillSortPipelineList(device,
     computePipelinesSort.length = 0;
 
     // set up sort pipelines
+    // adapted from Wikipedia's non-recursive example of bitonic sort:
+    // https://en.wikipedia.org/wiki/Bitonic_sorter
     for (let k = 2; k <= numAgents; k *= 2){ // k is doubled every iteration
       for (let j = k/2; j > 0; j = Math.floor(j/2)){ // j is halved at every iteration, with truncation of fractional parts
         computePipelinesSort.push(
