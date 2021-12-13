@@ -26,6 +26,16 @@ this project uses WebGPU for both.
 ![Real-Time Crowd Simulation GIF](img/obstacle_example.gif)
 
 ## Neighbor Searching
+#### Hash Grid Implementation
+Each agent reacts to other agents within two radii: near radius and far radius. A naive solution
+to finding agents within these radii would be to iterate over all agents in the scene and check their distance. Instead, a hash grid is used. A uniform grid is (non-visually) overlayed onto the plane of agents. The following series of compute shaders turns this conceptual grid into a useful tool, entirely on the GPU:
+- For each agent, a thread on the GPU identifies the cell that agent belongs to. Agent's outside the finite hash grid are considered to be in an invalid cell and do not contribute to further computation/simulation, but are rendered grey for clarity. 
+- The agent buffer is then sorted based on these cells using a GPU based bitonic sort via a series of compute shaders. This is done in multiple shader calls as a device-wide join is needed after each step. 
+- Finally an additional compute shader determines where in the agent buffer each cell's agents starts and ends, storing that data in a cell buffer. For example, agents in cell 33 could occupy indicies X through Y, and agents in cell 34 could then be found at indicies Y+1 through Z.
+Having completed all this, all that is needed to find neighbors is to simply iterate over agents between the start and end for the relevant cells. The relevant cells in the paper's implementation are hardcoded to be 9 cells: the agent's current cell and all cells adjacent to it. Our implementation, however calculates which cells are within the relevant radius. This calculation not only makes our hash grid more efficient for larger/denser grids (by ignoring cells outside the agent's radius), it is more robust for smaller cell sizes where the agent's radius may reach farther than just the adjoining cells. 
+#### Performance gains
+Our implementation can emulate a non-hashgrid implementation by setting the `gridWidth` parameter to 1 (to set the grid to be 1 cell wide by 1 cell long). 
+
 
 ## Position-Based Dynamics
 The main solver used in the paper is Position-based Dynamics with Jacobi Solver, which can be parallelized very easily.
