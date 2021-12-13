@@ -153,6 +153,13 @@ We apply basic shadow mapping to the scene based on the provided [WebGPU Example
 
 Since our test scenes vary from small/proximal to large/far, and agents' trajectories can span a large area, it is difficult to have consistently clean shadow map across the whole scene. The algorithm should be further optimized using techniques like Cascaded Shadow Mapping.
 
+| Scene	| With Shadows |	Without Shadows |
+| ----- | ------------ | ---------------- |
+|Proximal	|60	|202|
+|Bottleneck|	42	|58|
+|Obstacles	|23	|33|
+|Circle	|177	|190|
+
 # Additional Test Scenes
 
 Circle            | Dispersed                      
