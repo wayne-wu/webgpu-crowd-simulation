@@ -6,7 +6,7 @@ by [Ashley Alexander-Lee](), [Matt Elser](), and [Wayne Wu](https://www.wuwayne.
 
 [**Check it out live! (WebGPU Required)**](https://www.wuwayne.com/webgpu-crowd-simulation/)
 
-<img width="974" alt="Screen Shot 2021-12-12 at 11 57 46 AM" src="https://user-images.githubusercontent.com/77313916/145721748-dc58ae6a-2659-462c-9ea9-d2c527b6714f.png">
+![Teaser](img/teaser.png)
 
 Installation
 ============
@@ -50,7 +50,18 @@ This project attempts to implement a real-time crowd simulation based on the pap
 Unlike the paper which uses CUDA and Unreal Engine for simulation and rendering,
 this project uses WebGPU for both.
 
-![Real-Time Crowd Simulation GIF](img/obstacle_example.gif)
+![Real-Time Crowd Simulation GIF](img/overview.gif)
+
+# Compute Pipeline
+In WebGPU, we use compute shaders in replacement of CUDA kernels to simulate the agents. The algorithm can be broken down into five main processes including:
+
+1. **Velocity Planning**: advect the agent based on a calculated velocity field.
+2. **Neighbor Searching**: find the nearest neighbor and assign to hash grid.
+3. **Stability Solving**: resolve any collisions that remain from the previous time step for stability.
+4. **Constraint Solving**: project the main constraints and correct agents' positions.
+5. **Velocity Finalizing**: finalize the velocity and update the final position of the agent
+
+![Compute Pipeline](img/computepipeline.png)
 
 ## Neighbor Searching
 In order to ensure our neighbor finding was efficient, we employed a hash grid neighbor finder, based on [this article](https://developer.download.nvidia.com/assets/cuda/files/particles.pdf). 
@@ -59,7 +70,10 @@ In order to ensure our neighbor finding was efficient, we employed a hash grid n
 *Pictured above: A visualization of the early cell assignments, used to debug our initial implementation*
 
 ## Position-Based Dynamics
-The main solver used in the paper is Position-based Dynamics with Jacobi Solver, which can be parallelized very easily.
+The core algorithm of the paper is based on Position-based Dynamics with Jacobi Solver.
+Unlike the Gauss-Siedel method, the Jacobi solver can be more easily parallelized at the cost of slower convergence. While physically less accurate, PBD is really fast and therefore has been a popular simulation technique for real-time applications.
+
+For more information on PBD, please refer to the [original PBD paper](https://matthias-research.github.io/pages/publications/posBasedDyn.pdf).
 
 ### Short Range Collision
 The first constraint applied is a simple collision constraint model for short range collision.
@@ -87,8 +101,6 @@ Scene         | LR                 |  LR w/ Avoidance
 Proximal      |![](img/proximal_longrange.gif)   |  ![](img/proximal_avoidance.gif)     
 Dense         |![](img/dense_longrange.gif)   |  ![](img/dense_avoidance.gif)
 
-### Frictional Contact
-
 ### Cohesion
 Cohesion is added so that agents within the same group will tend to follow each other thus creating smoother packed motions.
 When cohesion is **off**, it is more likely to see individual agents wander off alone as shown below.
@@ -98,7 +110,7 @@ Debug                        | Cohesion OFF         | Cohesion ON
 ![](img/cohesion_debug.gif)  |![](img/nocohesion.gif) | ![](img/cohesion.gif)
 
 ### Obstacles Collision and Avoidance
-To add complexity to the scene, we support box-shaped obstacles in our implmentation.
+To add complexity to the scene, we support box-shaped obstacles in our implementation.
 The paper showcases walls as obstacles which can be modeled as line segments with short range collision constraint. 
 We use a similar approach that considers each edge of the box as a wall constraint.
 
@@ -112,10 +124,11 @@ Obstacles         | Bottleneck
 ![](img/obstacles.gif)        |![](img/bottleneck.gif)    
 
 ### Parameters Tuning
-The author has kindly provided the parameters used in the paper. Using it as a starting point has given us a reasonable result.
+The author has kindly provided the parameter values used in the paper. Using them as a starting point has given us a reasonable result with very minor tweaks. 
+The full list of parameter values used in our implementation can be found in [header.compute.wgsl](https://github.com/wayne-wu/webgpu-crowd-simulation/blob/main/src/shaders/header.compute.wgsl).
 
-## Rendering
-### Model Loading
+# Rendering
+## Model Loading
 We support several different models in order to produce a visually compelling scene, which you can select via the "models" dropdown in the gui. We used the `GLTFLoader` from [threejs](https://threejs.org/docs/#examples/en/loaders/GLTFLoader) to parse our gltf files, and we use the resulting `gltf` object to create the array buffer that we use in the WebGPU rendering pipeline. Each of the models affects the FPS proportionally to model complexity, with the duck model taking the least time, and the xbot taking the most (TODO: chart showing FPS impact of each model). We were able to borrow the gltf models from the following sources:
 - 'Duck' from [threejs](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf)
 - 'Cesium Man' from [Cesium](https://github.com/CesiumGS/cesium)
@@ -126,12 +139,25 @@ We support several different models in order to produce a visually compelling sc
 | ------------------------------------------ | ------------------------------------------ |
 | ![model_example3](/img/model_example3.png) | ![model example4](/img/model_example4.png) |
 
-## Test Scenes
+## Shadow Mapping
+We apply basic shadow mapping to the scene based on the provided [WebGPU Example](https://austin-eng.com/webgpu-samples/samples/shadowMapping). We introduce a crowd shadow render pipeline that renders the agents' depth, with respect to the light, into a depth buffer. The texture is then sampled when rendering the ground as well as the agents.
 
-## Future Work
+Since our test scenes vary from small/proximal to large/far, and agents' trajectories can span a large area, it is difficult to have consistently clean shadow map across the whole scene. The algorithm should be further optimized using techniques like Cascaded Shadow Mapping.
+
+# Additional Test Scenes
+
+Circle            | Dispersed                      
+:----------------:|:------------------:
+![](img/top_circle.gif)        |![](img/top_dispersed.gif)  
+
+Sparse            | Obstacles                      
+:----------------:|:------------------:
+![](img/top_sparse.gif)        |![](img/top_obstacles.gif)    
+
+# Future Work
 * Animation & Skinning
 * Cascaded Shadow Mapping
-* Separate Hash Grids for Short Range vs. Long Range
+* Separate Grids for Short Range vs. Long Range
 
 References
 ==========
