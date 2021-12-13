@@ -140,7 +140,7 @@ The full list of parameter values used in our implementation can be found in [he
 
 # Rendering
 ## Model Loading
-We support several different models in order to produce a visually compelling scene, which you can select via the "models" dropdown in the gui. We used the `GLTFLoader` from [threejs](https://threejs.org/docs/#examples/en/loaders/GLTFLoader) to parse our gltf files, and we use the resulting `gltf` object to create the array buffer that we use in the WebGPU rendering pipeline. Each of the models affects the FPS proportionally to model complexity, with the duck model taking the least time, and the xbot taking the most (TODO: chart showing FPS impact of each model). We were able to borrow the gltf models from the following sources:
+We support several different models in order to produce a visually compelling scene, which you can select via the "models" dropdown in the gui. We used the `GLTFLoader` from [threejs](https://threejs.org/docs/#examples/en/loaders/GLTFLoader) to parse our gltf files, and we use the resulting `gltf` object to create the array buffer that we use in the WebGPU rendering pipeline. Each of the models affects the FPS proportionally to model complexity, with the duck model taking the least time, and the xbot taking the most. We were able to borrow the gltf models from the following sources:
 - 'Duck' from [threejs](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf)
 - 'Cesium Man' from [Cesium](https://github.com/CesiumGS/cesium)
 - 'XBot' from [Mixamo](https://www.mixamo.com/)
@@ -155,7 +155,7 @@ We apply basic shadow mapping to the scene based on the provided [WebGPU Example
 
 Since our test scenes vary from small/proximal to large/far, and agents' trajectories can span a large area, it is difficult to have consistently clean shadow map across the whole scene. The algorithm should be further optimized using techniques like Cascaded Shadow Mapping.
 
-| Scene	| With Shadows |	Without Shadows |
+| Scene	| With Shadows (fps) |	Without Shadows (fps) |
 | ----- | ------------ | ---------------- |
 |Proximal	|60	|202|
 |Bottleneck|	42	|58|
