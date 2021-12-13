@@ -123,7 +123,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   const sceneParams = {
     scene: TestScene.PROXIMAL,
-    model: 'Cube',
+    model: 'Duck',
     showGoals: true,
     shadowOn: true,
     'total agents': "", // dummy, autofilled later
@@ -423,7 +423,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             setTestScene(vec3.fromValues(20, 20, 20), false, 9, 63, 2, true);
             break;
           case TestScene.DENSE:
-            setTestScene(vec3.fromValues(80, 75, 0), true, 13, 300, 0, false);
+            setTestScene(vec3.fromValues(80, 75, 0), true, 15, 1000, 0, false);
             break;
           case TestScene.SPARSE:
             setTestScene(vec3.fromValues(50, 50, 50), true, 12, 100, 0, false);
