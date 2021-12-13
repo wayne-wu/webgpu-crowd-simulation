@@ -154,7 +154,7 @@ const SampleLayout: React.FunctionComponent<
         canvasRef,
         gui,
         stats
-      });
+      }); 
 
       if (p instanceof Promise) {
         p.catch((err: Error) => {
@@ -215,6 +215,15 @@ const SampleLayout: React.FunctionComponent<
           }}
           ref={statsParentRef}
         ></div>
+        <div>
+        {error ? (
+          <>
+            <p>Is WebGPU Supported / Enabled?</p>
+            <p>Check out the <a href="https://github.com/wayne-wu/webgpu-crowd-simulation">Github page</a> for more info.</p>
+            <p>{`${error}`}</p>
+          </>
+        ) : null}
+        </div>
         <canvas ref={canvasRef} width={canvasWidth} height={canvasHeight}></canvas>
       </div>
     </main>
