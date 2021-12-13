@@ -11,7 +11,7 @@ let avgCoefficient : f32 = 1.2; // paper = 1.2 [1,2]
 let nearRadius : f32 = 2.0;
 let cohesionRadius : f32 = 5.0;
 let mu_static : f32 = 0.21;     // paper = 0.21
-let mu_kinematic : f32 = 0.15;  // papser = ?
+let mu_kinematic : f32 = 0.10;  // papser = ?
 let ksi : f32 = 0.0385;         // paper = 0.0385
 let xsph_c : f32 = 7.0;         // paper = 7.0
 let xsph_h : f32 = 217.0;       // paper = 217.0 // the smoothing distance specified in the paper (assumes particles with radius 1)

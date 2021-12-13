@@ -72,8 +72,6 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
           n = normalize(n);
           let w = agent.w / (agent.w + agent_j.w);
           var dx = -w * k_shortrange * f * n;
-          totalDx = totalDx + dx;
-          neighborCount = neighborCount + 1;
 
           if (friction) {
             // 4.2 Friction Contact (See 6.1 of https://mmacklin.com/uppfrta_preprint.pdf)
@@ -84,16 +82,18 @@ fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
             var xj = agent_j.xp - dx;  // assumes mass are the same
 
             var d_rel = (xi - agent.x) - (xj - agent_j.x);
-            dx = d_rel - dot(d_rel, n) * n;  // project to tangential component
-            var dx_norm = length(dx); 
-            if(dx_norm >= mu_static * d) {
-              dx = min(mu_kinematic * d/dx_norm, 1.0) * dx;
+            var d_tan = d_rel - dot(d_rel, n) * n;  // project to tangential component
+            var d_tan_norm = length(d_tan); 
+            if(d_tan_norm >= mu_static * d) {
+              d_tan = min(mu_kinematic * d/d_tan_norm, 1.0) * d_tan;
             }
-            dx = w * dx;
+            dx = dx + w * d_tan;
 
-            totalDx = totalDx + dx;
-            neighborCount = neighborCount + 1;
+            // neighborCount = neighborCount + 1;
           }
+
+          totalDx = totalDx + dx;
+          neighborCount = neighborCount + 1;
         }
       }
     }
