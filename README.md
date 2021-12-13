@@ -161,10 +161,13 @@ Sparse            | Obstacles
 
 References
 ==========
+- Main paper of the project: [PBD Crowd Simulation](https://tomerwei.github.io/pdfs/mig2017.pdf)
 - Base code from this [Particles WebGPU sample](https://github.com/austinEng/webgpu-samples) by Austin Eng
 - [3d-view-controls](https://www.npmjs.com/package/3d-view-controls) for camera manipulation
 - Camera class referenced from UPenn's CIS566 base code, written by Adam Mally
 - [dat-gui](https://github.com/dataarts/dat.gui) for gui controls
+- WebGPU [shadow mapping example](https://austin-eng.com/webgpu-samples/samples/shadowMapping) by Austin Eng
+- WebGPU [documentation](https://www.w3.org/TR/webgpu/)
 
 Bloopers
 ========
