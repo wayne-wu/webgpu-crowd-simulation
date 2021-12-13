@@ -123,11 +123,11 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   const sceneParams = {
     scene: TestScene.PROXIMAL,
-    model: 'Duck',
+    model: 'Cube',
     showGoals: true,
     shadowOn: true,
     'total agents': "", // dummy, autofilled later
-    'agent selector (2^x)': 10
+    '2^x agents': 10
   }
 
   const simulationParams = {
@@ -142,7 +142,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   // GUI GLOBALS ------------------------------------------------------------
   let prevGridWidth = guiParams.gridWidth;
-  let prevNumAgents = sceneParams['agent selector (2^x)'];
+  let prevNumAgents = sceneParams['2^x agents'];
   let prevTestScene = TestScene.DENSE;
   let prevModel = 'Duck';
   // default don't display slider to select number of agents -- will re-add if scene requires
@@ -212,7 +212,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   /////////////////////////////////////////////////////////////////////////
   const compBuffManager = new ComputeBufferManager(device,
                                                  sceneParams.scene,
-                                                 sceneParams['agent selector (2^x)'],
+                                                 sceneParams['2^x agents'],
                                                  simulationParams.gridWidth);
 
   //////////////////////////////////////////////////////////////////////////
@@ -335,7 +335,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
                         scenePlatformWidth: number, numObstacles: number, shadowOn: boolean){
     resetCameraFunc(camPos[0], camPos[1], camPos[2]); // set scene's camera position
     compBuffManager.numValidAgents = 1<<numAgents;    // number of agents to use in simulation
-    sceneParams['agent selector (2^x)'] = numAgents;  // number of agents displayed in GUI
+    sceneParams['2^x agents'] = numAgents;  // number of agents displayed in GUI
     platformWidth = scenePlatformWidth;               // size of the platform
     simulationParams.numObstacles = numObstacles;     // number of obstacles (used in compBufferManager, not gui)
     sceneParams.shadowOn = shadowOn;                      // display shadows on chosen scene
@@ -347,7 +347,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     }
     // if agent slider is supported and it doesn't exist, add it
     else if (displayAgentSlider && !numAgentsSliderDisplayed) {
-      sceneFolder.add(sceneParams, 'agent selector (2^x)', 1, 20, 1).listen();
+      sceneFolder.add(sceneParams, '2^x agents', 1, 20, 1).listen();
       numAgentsSliderDisplayed = true;
     }
     
@@ -403,10 +403,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     //------------------ Compute Calls ------------------------ //
     {
-      if (prevNumAgents != sceneParams['agent selector (2^x)']) {
+      if (prevNumAgents != sceneParams['2^x agents']) {
         // NOTE: we also reset the sim if the grid width changes
         // which is checked just above this
-        prevNumAgents = sceneParams['agent selector (2^x)'];
+        prevNumAgents = sceneParams['2^x agents'];
         totalAgentsDOM.innerText = Math.pow(2, prevNumAgents) + "";
         // set reset sim to true so that simulation starts over
         // and agents are redistributed
@@ -423,7 +423,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
             setTestScene(vec3.fromValues(20, 20, 20), false, 9, 63, 2, true);
             break;
           case TestScene.DENSE:
-            setTestScene(vec3.fromValues(50, 50, 50), true, 15, 100, 0, false);
+            setTestScene(vec3.fromValues(80, 75, 0), true, 13, 300, 0, false);
             break;
           case TestScene.SPARSE:
             setTestScene(vec3.fromValues(50, 50, 50), true, 12, 100, 0, false);
@@ -434,6 +434,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
           case TestScene.CIRCLE:
             setTestScene(vec3.fromValues(5, 20, 5), false, 6, 20, 0, true);
             break;
+          case TestScene.DISPERSED:
+            setTestScene(vec3.fromValues(0, 60, 0), false, 11, 100, 0, false);
+            break;
         }
         resetSim = true;
       }
@@ -441,7 +444,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       // recompute agent buffer if resetSim button pressed
       if (resetSim) {
         compBuffManager.testScene = sceneParams.scene;
-        //compBuffManager.numValidAgents = simulationParams.numAgents;
+        compBuffManager.numValidAgents = 1<<sceneParams['2^x agents'];
         compBuffManager.gridWidth = simulationParams.gridWidth;
 
         // NOTE: Can't have 0 binding size so we just set to 1 dummy if no obstacles

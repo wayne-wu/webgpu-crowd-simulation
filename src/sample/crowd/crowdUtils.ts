@@ -1,4 +1,5 @@
 import { mat4, vec3, vec2 } from "gl-matrix";
+import { maxHeaderSize } from "http";
 
 const scatterWidth = 100;
 const diskRadius = 0.5;
@@ -17,6 +18,7 @@ export enum TestScene {
   SPARSE = "sparse",
   OBSTACLES = "obstacles",
   CIRCLE = "circle",
+  DISPERSED = "dispersed",
 }
 
 
@@ -149,6 +151,9 @@ export class ComputeBufferManager {
         break;
       case TestScene.CIRCLE:
         this.initCircle(agentData, obstacleData);
+        break;
+      case TestScene.DISPERSED:
+        this.initDispersed(agentData, obstacleData);
         break;
     }
 
@@ -419,15 +424,17 @@ export class ComputeBufferManager {
   initDense(agents : Float32Array, obstacles: Float32Array) {
     const planeWidth = 95;  // platform width is 100 -- place 5 before end
     const tmpGoalData = new Array<vec2>();
-    for (let i = 0; i < this.numAgents/2; ++i) {
-      const x = i%200 - 100;
-      const z = Math.floor(i/200) + 10;
+    for (let i = 0; i < this.numAgents/4; i++) {
+      const x : number = i%125;
+      const z : number = Math.floor(i/125) + 7;
       const v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
+      this.setAgentData(agents, 4*i + 0, [x - 65, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
+      this.setAgentData(agents, 4*i + 1, [-x - 85, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
+      this.setAgentData(agents, 4*i + 2, [x - 75.1, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
+      this.setAgentData(agents, 4*i + 3, [-x - 74.9, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
     }
-    tmpGoalData.push(vec2.fromValues(0, -planeWidth));
-    tmpGoalData.push(vec2.fromValues(0, planeWidth));
+    tmpGoalData.push(vec2.fromValues(-75, -planeWidth));
+    tmpGoalData.push(vec2.fromValues(-75, planeWidth));
     this.goalData = tmpGoalData;
   }
 
@@ -484,6 +491,74 @@ export class ComputeBufferManager {
       tmpGoalData.push(vec2.fromValues(-x, -z));
     }
     this.goalData = tmpGoalData;
+  }
+
+  initDispersed(agents : Float32Array, obstacles: Float32Array) {
+    const planeWidth = 95;  // platform width is 100 -- place 5 before end
+    const dispWidth = 35;
+    const piOverThree = 3.14159 / 3.0;
+    const sqrt3 = Math.sqrt(3);
+    const v = 0.5;
+
+    // create six goals at the points of a hexagon
+    var goals = new Array<vec2>();
+    goals.push(vec2.fromValues(0, dispWidth));
+    goals.push(vec2.fromValues(Math.sin(piOverThree) * dispWidth, 
+                               Math.cos(piOverThree) * dispWidth));
+    goals.push(vec2.fromValues(Math.sin(2 * piOverThree) * dispWidth, 
+                               Math.cos(2 * piOverThree) * dispWidth));
+    goals.push(vec2.fromValues(0, -dispWidth));
+    goals.push(vec2.fromValues(Math.sin(-2 * piOverThree) * dispWidth, 
+                               Math.cos(-2 * piOverThree) * dispWidth));
+    goals.push(vec2.fromValues(Math.sin(-1 * piOverThree) * dispWidth, 
+                               Math.cos(-1 * piOverThree) * dispWidth));
+
+
+    // create six colors
+    var colors = new Array<vec3>(); 
+    colors.push(vec3.fromValues(0.5, 0.0, 0.0));
+    colors.push(vec3.fromValues(0.5, 0.2, 0.0));
+    colors.push(vec3.fromValues(0.5, 0.5, 0.0));
+    colors.push(vec3.fromValues(0.2, 0.5, 0.0));
+    colors.push(vec3.fromValues(0.0, 0.5, 0.2));
+    colors.push(vec3.fromValues(0.5, 0.0, 0.5));
+
+
+    // spawn N agents randomly within a hexagon
+    //var cluster = 0;
+    for (let i = 0; i < this.numAgents; ++i) {
+      const x = (Math.random() * 2 - 1) * dispWidth;
+      const z = (Math.random() * 2 - 1) * dispWidth;
+
+      // create a hexagon SDF
+      const h = Math.abs(x * 0.5) + Math.abs(z * sqrt3 * 0.5);
+      const isOutsideHexagon = Math.max(h, Math.abs(x)) - dispWidth * 0.75; 
+      if (isOutsideHexagon > 0.0){
+        // if we're outside the hexagon, discard the value and try again
+        // it could be more efficient, but it's simple
+        i--;
+        continue;
+      }
+     
+      // cluster agents by location into a checkerboard
+      const xc = (Math.sin(Math.round(x / 4) * 4) * 3) + 3; 
+      const zc = (Math.sin(Math.round(z / 4) * 4) * 3) + 3; 
+      let cluster = Math.floor(xc + zc) % 6; 
+
+      const col = colors[cluster];
+      const g = goals[cluster];
+      this.setAgentData(agents, 
+                        i, 
+                        [0.1+x, z], 
+                        [col[0], col[1], col[2], 1.0], 
+                        [0,-v], 
+                        preferredVelocity, 
+                        [g[0], g[1]], 
+                        cluster);
+      cluster++;
+      cluster %= 6;
+    }
+    this.goalData = goals;
   }
 
 }
