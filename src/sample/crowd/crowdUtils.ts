@@ -424,15 +424,17 @@ export class ComputeBufferManager {
   initDense(agents : Float32Array, obstacles: Float32Array) {
     const planeWidth = 95;  // platform width is 100 -- place 5 before end
     const tmpGoalData = new Array<vec2>();
-    for (let i = 0; i < this.numAgents/2; ++i) {
-      const x = i%200 - 100;
-      const z = Math.floor(i/200) + 10;
+    for (let i = 0; i < this.numAgents/4; i++) {
+      const x : number = i%125;
+      const z : number = Math.floor(i/125) + 7;
       const v = 0.5;
-      this.setAgentData(agents, 2*i, [0.1+x, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
-      this.setAgentData(agents, 2*i + 1, [-0.1+x, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
+      this.setAgentData(agents, 4*i + 0, [x - 65, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
+      this.setAgentData(agents, 4*i + 1, [-x - 85, z], agentColor1, [0,-v], preferredVelocity, [0, -planeWidth], 0);
+      this.setAgentData(agents, 4*i + 2, [x - 75.1, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
+      this.setAgentData(agents, 4*i + 3, [-x - 74.9, -z], agentColor2, [0,v], preferredVelocity, [0, planeWidth], 1);
     }
-    tmpGoalData.push(vec2.fromValues(0, -planeWidth));
-    tmpGoalData.push(vec2.fromValues(0, planeWidth));
+    tmpGoalData.push(vec2.fromValues(-75, -planeWidth));
+    tmpGoalData.push(vec2.fromValues(-75, planeWidth));
     this.goalData = tmpGoalData;
   }
 
@@ -529,8 +531,8 @@ export class ComputeBufferManager {
       const z = (Math.random() * 2 - 1) * dispWidth;
 
       // create a hexagon SDF
-      let h = Math.abs(x * 0.5) + Math.abs(z * sqrt3 * 0.5);
-      let isOutsideHexagon = Math.max(h, Math.abs(x)) - dispWidth * 0.75; 
+      const h = Math.abs(x * 0.5) + Math.abs(z * sqrt3 * 0.5);
+      const isOutsideHexagon = Math.max(h, Math.abs(x)) - dispWidth * 0.75; 
       if (isOutsideHexagon > 0.0){
         // if we're outside the hexagon, discard the value and try again
         // it could be more efficient, but it's simple
@@ -539,12 +541,12 @@ export class ComputeBufferManager {
       }
      
       // cluster agents by location into a checkerboard
-      let xc = (Math.sin(Math.round(x / 4) * 4) * 3) + 3; 
-      let zc = (Math.sin(Math.round(z / 4) * 4) * 3) + 3; 
+      const xc = (Math.sin(Math.round(x / 4) * 4) * 3) + 3; 
+      const zc = (Math.sin(Math.round(z / 4) * 4) * 3) + 3; 
       let cluster = Math.floor(xc + zc) % 6; 
 
-      let col = colors[cluster];
-      let g = goals[cluster];
+      const col = colors[cluster];
+      const g = goals[cluster];
       this.setAgentData(agents, 
                         i, 
                         [0.1+x, z], 
