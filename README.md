@@ -1,4 +1,4 @@
-# Real-Time Crowd Simulation in WebGPU
+# Real-Time Position-Based Crowd Simulation in WebGPU
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Final Project**
 
