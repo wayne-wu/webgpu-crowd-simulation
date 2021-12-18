@@ -180,10 +180,12 @@ Sparse            | Obstacles
 * Animation & Skinning
 * Cascaded Shadow Mapping
 * Separate Grids for Short Range vs. Long Range
+* WebGPU Performance Optimization
+* Crowd Behavior Improvements
 
 References
 ==========
-- Main paper of the project: [PBD Crowd Simulation](https://tomerwei.github.io/pdfs/mig2017.pdf)
+- Main paper of the project: [PBD Crowd Simulation](https://tomerwei.github.io/pdfs/mig2017.pdf) by Tomer Weiss et al.
 - Base code from this [Particles WebGPU sample](https://github.com/austinEng/webgpu-samples) by Austin Eng
 - [3d-view-controls](https://www.npmjs.com/package/3d-view-controls) for camera manipulation
 - Camera class referenced from UPenn's CIS566 base code, written by Adam Mally
