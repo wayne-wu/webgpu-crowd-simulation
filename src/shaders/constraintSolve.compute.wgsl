@@ -2,11 +2,11 @@
 // PBD Constraint Solving Compute Shader
 ////////////////////////////////////////////////////////////////////////////////
 
-[[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
-[[binding(1), group(0)]] var<storage, read> agentData_r : Agents;
-[[binding(2), group(0)]] var<storage, write> agentData_w : Agents;
-[[binding(3), group(0)]] var<storage, read> grid : Grid;
-[[binding(4), group(0)]] var<storage, read> obstacleData : Obstacles;
+@binding(0) @group(0) var<uniform> sim_params : SimulationParams;
+@binding(1) @group(0) var<storage, read_write> agentData_r : Agents;
+@binding(2) @group(0) var<storage, read_write> agentData_w : Agents;
+@binding(3) @group(0) var<storage, read_write> grid : Grid;
+@binding(4) @group(0) var<storage, read_write> obstacleData : Obstacles;
 
 fn long_range_constraint(agent: Agent, 
                          agent_j: Agent, 
@@ -100,8 +100,8 @@ fn long_range_constraint(agent: Agent,
   }
 }
 
-[[stage(compute), workgroup_size(64)]]
-fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
+@stage(compute) @workgroup_size(64)
+fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   let idx = GlobalInvocationID.x;
 
   var itr = sim_params.iteration;

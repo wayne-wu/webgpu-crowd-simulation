@@ -36,7 +36,7 @@ function getSortStepWGSL(numAgents : number, k : number, j : number, ){
   // race conditions. The least gross way I can think to do that is to create a new pipeline
   // for each step.
   const baseWGSL = `
-  [[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
+  @binding(1) @group(0) var<storage, read_write> agentData : Agents;
 
   fn swap(idx1 : u32, idx2 : u32) {
     var tmp = agentData.agents[idx1];
@@ -52,8 +52,8 @@ function getSortStepWGSL(numAgents : number, k : number, j : number, ){
     return agentData.agents[idx1].cell > agentData.agents[idx2].cell;
   }
 
-  [[stage(compute), workgroup_size(256)]]
-  fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
+  @stage(compute) @workgroup_size(256)
+  fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     let idx = GlobalInvocationID.x ;
     
     var j : u32 = ${j}u;
@@ -482,7 +482,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         passEncoder.setPipeline(computePipelinesPreSort[i]);
         passEncoder.setBindGroup(0, computeBindGroup);
         // kick off the compute shader
-        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 64));
+        passEncoder.dispatchWorkgroups(Math.ceil(compBuffManager.numAgents / 64));
       }
 
       // ----- Compute Pass Sort -----
@@ -490,7 +490,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         passEncoder.setPipeline(computePipelinesSort[i]);
         passEncoder.setBindGroup(0, computeBindGroup);
         // kick off the compute shader
-        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 256));
+        passEncoder.dispatchWorkgroups(Math.ceil(compBuffManager.numAgents / 256));
       }
       
       // ----- Compute Pass Post Sort 1 -----
@@ -499,9 +499,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         passEncoder.setPipeline(computePipelinesPostSort[i]);
         passEncoder.setBindGroup(0, computeBindGroup);
         // kick off the compute shader
-        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 64));
+        passEncoder.dispatchWorkgroups(Math.ceil(compBuffManager.numAgents / 64));
       }
-      passEncoder.endPass();
+      passEncoder.end();
 
       device.queue.submit([computeCommand.finish()]);
       
@@ -518,8 +518,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         passEncoder = computeCommand.beginComputePass();
         passEncoder.setPipeline(computePipelinesPostSort[constraintShaderIdx]);
         passEncoder.setBindGroup(0, computeBindGroup);
-        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 64));
-        passEncoder.endPass();
+        passEncoder.dispatchWorkgroups(Math.ceil(compBuffManager.numAgents / 64));
+        passEncoder.end();
         device.queue.submit([computeCommand.finish()]);
 
         // ping-pong buffers
@@ -536,9 +536,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         passEncoder.setPipeline(computePipelinesPostSort[i]);
         passEncoder.setBindGroup(0, computeBindGroup);
         // kick off the compute shader
-        passEncoder.dispatch(Math.ceil(compBuffManager.numAgents / 64));
+        passEncoder.dispatchWorkgroups(Math.ceil(compBuffManager.numAgents / 64));
       }
-      passEncoder.endPass();
+      passEncoder.end();
 
       device.queue.submit([computeCommand.finish()])
     }
@@ -575,7 +575,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         renderBuffManager.drawGoals(device, renderPass, compBuffManager.goalsBuffer, compBuffManager.numGoals);
       }
 
-      renderPass.endPass();
+      renderPass.end();
       device.queue.submit([renderCommand.finish()]);
     }
 

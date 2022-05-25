@@ -5,25 +5,25 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Vertex shader
 ////////////////////////////////////////////////////////////////////////////////
-[[binding(0), group(0)]] var<uniform> scene : Scene;
+@binding(0) @group(0) var<uniform> scene : Scene;
 
 struct VertexInput {
-  [[location(0)]] position : vec3<f32>;  // obstacle position (world space)
-  [[location(1)]] rotation : f32;
-  [[location(2)]] scale    : vec3<f32>;
-  [[location(3)]] mesh_pos : vec4<f32>;  // mesh vertex position (model space)
-  [[location(4)]] mesh_uv  : vec2<f32>;  // mesh vertex uv
-  [[location(5)]] mesh_nor : vec4<f32>;
+  @location(0) position : vec3<f32>;  // obstacle position (world space)
+  @location(1) rotation : f32;
+  @location(2) scale    : vec3<f32>;
+  @location(3) mesh_pos : vec4<f32>;  // mesh vertex position (model space)
+  @location(4) mesh_uv  : vec2<f32>;  // mesh vertex uv
+  @location(5) mesh_nor : vec4<f32>;
 };
 
 struct VertexOutput {
-  [[builtin(position)]] position : vec4<f32>;
-  [[location(0)]]       color    : vec4<f32>;
-  [[location(1)]]       normal   : vec4<f32>;
-  [[location(2)]]       fragPos  : vec4<f32>;
+  @builtin(position) position : vec4<f32>;
+  @location(0)       color    : vec4<f32>;
+  @location(1)       normal   : vec4<f32>;
+  @location(2)       fragPos  : vec4<f32>;
 };
 
-[[stage(vertex)]]
+@stage(vertex)
 fn vs_main(in : VertexInput) -> VertexOutput {
 
   let c = cos(in.rotation);
@@ -51,8 +51,8 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 ////////////////////////////////////////////////////////////////////////////////
 // Fragment shader
 ////////////////////////////////////////////////////////////////////////////////
-[[stage(fragment)]]
-fn fs_main(in : VertexOutput) -> [[location(0)]] vec4<f32> {
+@stage(fragment)
+fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   var lightDir = normalize(scene.lightPos - in.fragPos.xyz);
   var lambertTerm = dot(normalize(lightDir), normalize(in.normal.xyz));
   var lightColor = vec4<f32>(1.0, 1.0, 1.0, 1.0);

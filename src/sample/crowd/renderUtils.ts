@@ -291,16 +291,19 @@ export class RenderBufferManager {
         {
           view: undefined, // Assigned later
 
-          loadValue: { r: 0.89, g: 0.92, b: 1.0, a: 1.0 },
+          clearValue: { r: 0.5, g: 0.5, b: 0.5, a: 1.0 },
+          loadOp: 'clear',
           storeOp: 'store',
         },
       ],
       depthStencilAttachment: {
         view: depthTexture.createView(),
-
-        depthLoadValue: 1.0,
+        
+        depthClearValue: 1.0,
+        depthLoadOp: 'clear',
         depthStoreOp: 'store',
-        stencilLoadValue: 0,
+        stencilClearValue: 0,
+        stencilLoadOp: 'clear',
         stencilStoreOp: 'store',
       },
     };
@@ -316,10 +319,9 @@ export class RenderBufferManager {
       colorAttachments: [],
       depthStencilAttachment: {
         view: this.shadowDepthTextureView,
-        depthLoadValue: 1.0,
+        depthClearValue: 1.0,
+        depthLoadOp: 'clear',
         depthStoreOp: 'store',
-        stencilLoadValue: 0,
-        stencilStoreOp: 'store',
       },
     };
   }
@@ -588,7 +590,7 @@ export class RenderBufferManager {
     shadowPass.setVertexBuffer(0, agentsBuffer);
     shadowPass.setVertexBuffer(1, this.meshVertexBuffer);
     shadowPass.draw(this.mesh.vertexCount, numAgents, 0, 0);
-    shadowPass.endPass();
+    shadowPass.end();
   }
 
   drawCrowd(device: GPUDevice, passEncoder: GPURenderPassEncoder, agentsBuffer: GPUBuffer, numAgents: number) {

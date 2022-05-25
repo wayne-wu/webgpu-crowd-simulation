@@ -3,21 +3,21 @@
 ////////////////////////////////////////////////////////////////////// 
 
 
-[[binding(0), group(0)]] var<uniform> scene : Scene;
-[[binding(0), group(1)]] var<uniform> model : Model;
+@binding(0) @group(0) var<uniform> scene : Scene;
+@binding(0) @group(1) var<uniform> model : Model;
   
 struct VertexOutput {
-  [[builtin(position)]] position : vec4<f32>;
-  [[location(0)]] fragUV : vec2<f32>;
-  [[location(1)]] fragPos: vec4<f32>;
-  [[location(2)]] fragNor : vec3<f32>;
-  [[location(3)]] shadowPos : vec3<f32>;
+  @builtin(position) position : vec4<f32>;
+  @location(0) fragUV : vec2<f32>;
+  @location(1) fragPos: vec4<f32>;
+  @location(2) fragNor : vec3<f32>;
+  @location(3) shadowPos : vec3<f32>;
 };
   
-[[stage(vertex)]]
-fn vs_main([[location(0)]] position : vec4<f32>,
-            [[location(1)]] uv : vec2<f32>,
-            [[location(2)]] nor : vec4<f32>) -> VertexOutput {
+@stage(vertex)
+fn vs_main(@location(0) position : vec4<f32>,
+           @location(1) uv : vec2<f32>,
+           @location(2) nor : vec4<f32>) -> VertexOutput {
   var output : VertexOutput;
   output.fragPos = model.modelMatrix * position;
   output.position = scene.cameraViewProjMatrix * output.fragPos;
@@ -44,15 +44,15 @@ fn vs_main([[location(0)]] position : vec4<f32>,
 //            Fragment Shader for Platform                          //
 ////////////////////////////////////////////////////////////////////// 
 
-[[group(0), binding(1)]] var mySampler: sampler;
-[[group(0), binding(2)]] var myTexture: texture_2d<f32>;
-[[group(0), binding(3)]] var shadowSampler: sampler_comparison;
-[[group(0), binding(4)]] var shadowMap: texture_depth_2d;
+@group(0) @binding(1) var mySampler: sampler;
+@group(0) @binding(2) var myTexture: texture_2d<f32>;
+@group(0) @binding(3) var shadowSampler: sampler_comparison;
+@group(0) @binding(4) var shadowMap: texture_depth_2d;
 
 let ambientFactor = 0.2;
 
-[[stage(fragment)]]
-fn fs_platform(in : VertexOutput) -> [[location(0)]] vec4<f32> {
+@stage(fragment)
+fn fs_platform(in : VertexOutput) -> @location(0) vec4<f32> {
 
   var visibility : f32 = 1.0;
   if(scene.shadowOn > 0.99) {
@@ -94,15 +94,15 @@ fn fs_platform(in : VertexOutput) -> [[location(0)]] vec4<f32> {
 ////////////////////////////////////////////////////////////////////////
 
 struct VertexOutputGoal {
-    [[builtin(position)]] Position : vec4<f32>;
-    [[location(0)]] fragPosition: vec4<f32>;
-    [[location(1)]] fragNor : vec4<f32>;
+    @builtin(position) Position : vec4<f32>;
+    @location(0) fragPosition: vec4<f32>;
+    @location(1) fragNor : vec4<f32>;
 };
 
-[[stage(vertex)]]
-  fn vs_goal([[location(0)]] goalPos : vec4<f32>,
-             [[location(1)]] meshPos : vec4<f32>,
-             [[location(2)]] meshNor : vec4<f32>) -> VertexOutputGoal {
+@stage(vertex)
+  fn vs_goal(@location(0) goalPos : vec4<f32>,
+             @location(1) meshPos : vec4<f32>,
+             @location(2) meshNor : vec4<f32>) -> VertexOutputGoal {
 
     // Scale the goal based on distance to camera
     var s = 0.01*distance(scene.cameraPos, goalPos.xyz);
@@ -120,9 +120,9 @@ struct VertexOutputGoal {
     return output;
   }
 
-[[stage(fragment)]]
-fn fs_goal([[location(0)]] fragPosition: vec4<f32>,
-               [[location(1)]] fragNor : vec4<f32>) -> [[location(0)]] vec4<f32> {
+@stage(fragment)
+fn fs_goal(@location(0) fragPosition: vec4<f32>,
+           @location(1) fragNor : vec4<f32>) -> @location(0) vec4<f32> {
   var lightDir = vec4<f32>(1.0, 1.0, 1.0, 0.0);
   var lambertTerm = dot(normalize(lightDir), normalize(fragNor));
 

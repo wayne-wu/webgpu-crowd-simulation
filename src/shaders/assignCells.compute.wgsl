@@ -3,11 +3,11 @@
 // Assign Cells Compute shader
 ////////////////////////////////////////////////////////////////////////////////
 
-[[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
-[[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
+@binding(0) @group(0) var<uniform> sim_params : SimulationParams;
+@binding(1) @group(0) var<storage, read_write> agentData : Agents;
 
-[[stage(compute), workgroup_size(64)]]
-fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
+@stage(compute) @workgroup_size(64)
+fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   // Calculate which grid cell each agent is in and store it
 
   let idx = GlobalInvocationID.x;

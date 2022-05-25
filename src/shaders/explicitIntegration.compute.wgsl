@@ -2,16 +2,16 @@
 // Explicit Integration for Advecting the Agents
 ////////////////////////////////////////////////////////////////////////////////
 
-[[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
-[[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
+@binding(0) @group(0) var<uniform> sim_params : SimulationParams;
+@binding(1) @group(0) var<storage, read_write> agentData : Agents;
 
 fn getVelocityFromPlanner(agent : Agent) -> vec3<f32> {
   // TODO: Implement a more complex planner
   return normalize(agent.goal - agent.x) * agent.speed;
 }
 
-[[stage(compute), workgroup_size(64)]]
-fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
+@stage(compute) @workgroup_size(64)
+fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
   let idx = GlobalInvocationID.x;
   var agent = agentData.agents[idx];

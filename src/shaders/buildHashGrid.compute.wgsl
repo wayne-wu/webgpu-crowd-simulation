@@ -2,12 +2,12 @@
 // Build Hash Grid - figure out start/end indices of cells in sorted agent array
 ////////////////////////////////////////////////////////////////////////////////
 
-[[binding(0), group(0)]] var<uniform> sim_params : SimulationParams;
-[[binding(1), group(0)]] var<storage, read_write> agentData : Agents;
-[[binding(3), group(0)]] var<storage, read_write> grid : Grid;
+@binding(0) @group(0) var<uniform> sim_params : SimulationParams;
+@binding(1) @group(0) var<storage, read_write> agentData : Agents;
+@binding(3) @group(0) var<storage, read_write> grid : Grid;
 
-[[stage(compute), workgroup_size(64)]]
-fn main([[builtin(global_invocation_id)]] GlobalInvocationID : vec3<u32>) {
+@stage(compute) @workgroup_size(64)
+fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   // build Grid, an array of start/end indicies that indicate where
   // each grid cell starts/ends on an array of agents sorted by cell
 

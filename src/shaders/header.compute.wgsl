@@ -21,7 +21,7 @@ let wall_radius : f32 = 0.5;
 let friction : bool = true;
 
 // ----- Struct -----
-[[block]] struct SimulationParams {
+struct SimulationParams {
   deltaTime : f32;
   avoidance : f32;
   numAgents : f32;
@@ -45,7 +45,7 @@ struct Agent {
   group : f32;
 };
 
-[[block]] struct Agents {
+struct Agents {
   agents : array<Agent>;
 };
 
@@ -54,7 +54,7 @@ struct CellIndices {
   end   : u32;
 };
 
-[[block]] struct Grid {
+struct Grid {
   cells : array<CellIndices>;
 };
 
@@ -64,7 +64,7 @@ struct Obstacle {
   scale : vec3<f32>;
 };
 
-[[block]] struct Obstacles {
+struct Obstacles {
   obstacles : array<Obstacle>;
 };
 
