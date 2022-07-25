@@ -7,14 +7,14 @@
 @binding(0) @group(1) var<uniform> model : Model;
   
 struct VertexOutput {
-  @builtin(position) position : vec4<f32>;
-  @location(0) fragUV : vec2<f32>;
-  @location(1) fragPos: vec4<f32>;
-  @location(2) fragNor : vec3<f32>;
-  @location(3) shadowPos : vec3<f32>;
-};
+  @builtin(position) position : vec4<f32>,
+  @location(0) fragUV : vec2<f32>,
+  @location(1) fragPos: vec4<f32>,
+  @location(2) fragNor : vec3<f32>,
+  @location(3) shadowPos : vec3<f32>,
+}
   
-@stage(vertex)
+@vertex
 fn vs_main(@location(0) position : vec4<f32>,
            @location(1) uv : vec2<f32>,
            @location(2) nor : vec4<f32>) -> VertexOutput {
@@ -27,7 +27,7 @@ fn vs_main(@location(0) position : vec4<f32>,
   if(scene.shadowOn > 0.99) {
     // Calculate shadow pos here to be interpolated in fs
     // XY is in (-1, 1) space, Z is in (0, 1) space
-    let posFromLight : vec4<f32> = scene.lightViewProjMatrix * output.fragPos;
+    var posFromLight : vec4<f32> = scene.lightViewProjMatrix * output.fragPos;
 
     // Convert XY to (0, 1)
     // Y is flipped because texture coords are Y-down.
@@ -49,9 +49,9 @@ fn vs_main(@location(0) position : vec4<f32>,
 @group(0) @binding(3) var shadowSampler: sampler_comparison;
 @group(0) @binding(4) var shadowMap: texture_depth_2d;
 
-let ambientFactor = 0.2;
+const ambientFactor = 0.2;
 
-@stage(fragment)
+@fragment
 fn fs_platform(in : VertexOutput) -> @location(0) vec4<f32> {
 
   var visibility : f32 = 1.0;
@@ -60,7 +60,7 @@ fn fs_platform(in : VertexOutput) -> @location(0) vec4<f32> {
     for (var y : i32 = -1 ; y <= 1 ; y = y + 1) {
         for (var x : i32 = -1 ; x <= 1 ; x = x + 1) {
           // NOTE: Must change the texel offset size if texture size is changed
-          let offset : vec2<f32> = vec2<f32>(
+          var offset : vec2<f32> = vec2<f32>(
             f32(x) * 0.00048828,
             f32(y) * 0.00048828);
 
@@ -75,7 +75,7 @@ fn fs_platform(in : VertexOutput) -> @location(0) vec4<f32> {
 
   var lightDir = normalize(scene.lightPos - in.fragPos.xyz);
   var lambertTerm = dot(normalize(lightDir), normalize(in.fragNor));
-  let lightingTerm = min(ambientFactor + visibility * lambertTerm, 1.0);
+  var lightingTerm = min(ambientFactor + visibility * lambertTerm, 1.0);
 
   if (in.fragUV.x == -1.0){
     return vec4<f32>(0.9, 0.9, 0.9, 1.0);
@@ -94,13 +94,13 @@ fn fs_platform(in : VertexOutput) -> @location(0) vec4<f32> {
 ////////////////////////////////////////////////////////////////////////
 
 struct VertexOutputGoal {
-    @builtin(position) Position : vec4<f32>;
-    @location(0) fragPosition: vec4<f32>;
-    @location(1) fragNor : vec4<f32>;
-};
+    @builtin(position) Position : vec4<f32>,
+    @location(0) fragPosition: vec4<f32>,
+    @location(1) fragNor : vec4<f32>,
+}
 
-@stage(vertex)
-  fn vs_goal(@location(0) goalPos : vec4<f32>,
+@vertex
+fn vs_goal(@location(0) goalPos : vec4<f32>,
              @location(1) meshPos : vec4<f32>,
              @location(2) meshNor : vec4<f32>) -> VertexOutputGoal {
 
@@ -120,7 +120,7 @@ struct VertexOutputGoal {
     return output;
   }
 
-@stage(fragment)
+@fragment
 fn fs_goal(@location(0) fragPosition: vec4<f32>,
            @location(1) fragNor : vec4<f32>) -> @location(0) vec4<f32> {
   var lightDir = vec4<f32>(1.0, 1.0, 1.0, 0.0);

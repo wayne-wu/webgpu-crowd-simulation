@@ -10,16 +10,16 @@ fn rand() -> f32 {
 }
 
 struct Scene {
-    lightViewProjMatrix : mat4x4<f32>;
-    cameraViewProjMatrix : mat4x4<f32>;
-    lightPos : vec3<f32>;
-    gridOn : f32;
-    cameraPos : vec3<f32>;
-    time : f32;
-    shadowOn : f32;
-};
+    lightViewProjMatrix : mat4x4<f32>,
+    cameraViewProjMatrix : mat4x4<f32>,
+    lightPos : vec3<f32>,
+    gridOn : f32,
+    cameraPos : vec3<f32>,
+    time : f32,
+    shadowOn : f32,
+}
 
 struct Model {
-    modelMatrix : mat4x4<f32>;
-};
+    modelMatrix : mat4x4<f32>,
+}
 

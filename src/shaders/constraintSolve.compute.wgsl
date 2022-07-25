@@ -15,57 +15,57 @@ fn long_range_constraint(agent: Agent,
                          count: ptr<function, i32>, 
                          totalDx: ptr<function, vec3<f32>>)
 {
-  let r = agent.r + agent_j.r;
+  var r = agent.r + agent_j.r;
   var r_sq = r * r;
 
-  let dist = distance(agent.x, agent_j.x);
+  var dist = distance(agent.x, agent_j.x);
   if (dist < r) {
     r_sq = (r - dist) * (r - dist);
   }
 
   // relative displacement
-  let x_ij = agent.x - agent_j.x;
+  var x_ij = agent.x - agent_j.x;
 
   // relative velocity
-  let v_ij = (1.0/dt) * (agent.xp - agent.x - agent_j.xp + agent_j.x);
+  var v_ij = (1.0/dt) * (agent.xp - agent.x - agent_j.xp + agent_j.x);
 
-  let a = dot(v_ij, v_ij);
-  let b = -dot(x_ij, v_ij);
-  let c = dot(x_ij, x_ij) - r_sq;
+  var a = dot(v_ij, v_ij);
+  var b = -dot(x_ij, v_ij);
+  var c = dot(x_ij, x_ij) - r_sq;
   var discr = b*b - a*c;
   if (discr < 0.0 || abs(a) < eps) { return; }
 
   discr = sqrt(discr);
 
   // Compute exact time to collision
-  let t = (b - discr)/a;
-  //let t2 = (b + discr)/a;
+  var t = (b - discr)/a;
+  //const t2 = (b + discr)/a;
   //var t = select(t1, t2, t2 < t1 && t2 > 0.0);
 
   // Prune out invalid case
   if (t < eps || t > t0) { return; }
 
   // Get time before and after collision
-  let t_nocollision = dt * floor(t/dt);
-  let t_collision = dt + t_nocollision;
+  var t_nocollision = dt * floor(t/dt);
+  var t_collision = dt + t_nocollision;
 
   // Get collision and collision-free positions
-  let xi_nocollision = agent.x + t_nocollision * agent.v;
+  var xi_nocollision = agent.x + t_nocollision * agent.v;
   var xi_collision   = agent.x + t_collision * agent.v;
-  let xj_nocollision = agent_j.x + t_nocollision * agent_j.v;
+  var xj_nocollision = agent_j.x + t_nocollision * agent_j.v;
   var xj_collision   = agent_j.x + t_collision * agent_j.v;
 
   // Enforce collision free for x_collision using distance constraint
   var n = xi_collision - xj_collision;
-  let d = length(n);
+  var d = length(n);
 
-  let f = d - r;
+  var f = d - r;
   if (f < 0.0) {
     n = normalize(n);
     
     var k = k_longrange * exp(-t_nocollision*t_nocollision/t0);
     k = 1.0 - pow(1.0 - k, 1.0/(f32(itr + 1)));
-    let w = agent.w / (agent.w + agent_j.w);
+    var w = agent.w / (agent.w + agent_j.w);
     var dx = -w * f * n;
 
     // 4.5 Avoidance Model
@@ -75,10 +75,10 @@ fn long_range_constraint(agent: Agent,
       xj_collision = xj_collision - dx;
 
       // total relative displacement
-      let d_vec = (xi_collision - xi_nocollision) - (xj_collision - xj_nocollision);
+      var d_vec = (xi_collision - xi_nocollision) - (xj_collision - xj_nocollision);
 
       // tangential relative displacement
-      let d_tangent = d_vec - dot(d_vec, n)*n;
+      var d_tangent = d_vec - dot(d_vec, n)*n;
 
       // NOTE: https://github.com/tomerwei/pbd-crowd-sim/blob/master/src/crowds_cpu_orginal.cpp#L1584
       // The author seems to be adding tangential component back to
@@ -100,12 +100,12 @@ fn long_range_constraint(agent: Agent,
   }
 }
 
-@stage(compute) @workgroup_size(64)
+@compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  let idx = GlobalInvocationID.x;
+  var idx = GlobalInvocationID.x;
 
   var itr = sim_params.iteration;
-  let dt = sim_params.deltaTime;
+  var dt = sim_params.deltaTime;
 
   var agent = agentData_r.agents[idx];
   var totalDx = vec3<f32>(0.0, 0.0, 0.0);
@@ -117,21 +117,21 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     return;
   }
 
-  let gridWidth = sim_params.gridWidth;
-  let gridHeight = gridWidth;//sim_params.gridWidth;
+  var gridWidth = sim_params.gridWidth;
+  var gridHeight = gridWidth;//sim_params.gridWidth;
   // TODO don't hardcode
-  let cellWidth = 1000.0 / gridWidth;
+  var cellWidth = 1000.0 / gridWidth;
   // compute cells that could conceivably contain neighbors
-  let bboxCorners = getBBoxCornerCells(agent.x.x,
+  var bboxCorners = getBBoxCornerCells(agent.x.x,
                                        agent.x.z,
                                        gridWidth,
                                        cellWidth,
                                        sim_params.farRadius);
 
-  let minX = bboxCorners[0];
-  let minY = bboxCorners[1];
-  let maxX = bboxCorners[2];
-  let maxY = bboxCorners[3];
+  var minX = bboxCorners[0];
+  var minY = bboxCorners[1];
+  var maxX = bboxCorners[2];
+  var maxY = bboxCorners[3];
 
   //for (var c : u32 = 0u; c < cellsToCheck; c = c + 1u ){
   for (var cellY = minY; cellY <= maxY; cellY = cellY + 1){
@@ -143,17 +143,17 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
       if (cellX < 0 || cellX >= i32(gridWidth)){
         continue;
       }
-      let cellIdx = cell2dto1d(cellX, cellY, gridWidth);
-      let cell : CellIndices = grid.cells[cellIdx];
+      var cellIdx = cell2dto1d(cellX, cellY, gridWidth);
+      var cell : CellIndices = grid.cells[cellIdx];
       for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
 
         if (idx == i) { 
           // ignore ourselves
           continue; 
         }
-        let agent_j = agentData_r.agents[i];
+        var agent_j = agentData_r.agents[i];
 
-        let dist = distance(agent.x, agent_j.x);
+        var dist = distance(agent.x, agent_j.x);
 
         if (dist > sim_params.farRadius){
           continue;
@@ -177,7 +177,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   }
 
   if (neighborCount > 0) {
-    let k = 1.0 - pow(1.0 - k_obstacle, 1.0/(f32(itr + 1)));
+    var k = 1.0 - pow(1.0 - k_obstacle, 1.0/(f32(itr + 1)));
     agent.xp = agent.xp + avgCoefficient * k * totalDx / f32(neighborCount);
   }
 

@@ -52,9 +52,9 @@ function getSortStepWGSL(numAgents : number, k : number, j : number, ){
     return agentData.agents[idx1].cell > agentData.agents[idx2].cell;
   }
 
-  @stage(compute) @workgroup_size(256)
+  @compute @workgroup_size(256)
   fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-    let idx = GlobalInvocationID.x ;
+    var idx = GlobalInvocationID.x ;
     
     var j : u32 = ${j}u;
     var k : u32 = ${k}u;
@@ -201,11 +201,13 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     canvasRef.current.clientWidth * devicePixelRatio,
     canvasRef.current.clientHeight * devicePixelRatio,
   ];
-  const presentationFormat = context.getPreferredFormat(adapter);
+
+  const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
   context.configure({
     device,
     format: presentationFormat,
+    alphaMode: 'opaque',
     size: presentationSize,
   });
 

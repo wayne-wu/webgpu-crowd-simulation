@@ -10,10 +10,10 @@ fn getVelocityFromPlanner(agent : Agent) -> vec3<f32> {
   return normalize(agent.goal - agent.x) * agent.speed;
 }
 
-@stage(compute) @workgroup_size(64)
+@compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
-  let idx = GlobalInvocationID.x;
+  var idx = GlobalInvocationID.x;
   var agent = agentData.agents[idx];
 
   if (idx >= u32(sim_params.numAgents)){

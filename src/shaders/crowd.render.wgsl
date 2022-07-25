@@ -6,26 +6,26 @@
 @binding(0) @group(1) var<uniform> model : Model;
 
 struct VertexInput {
-  @location(0) position : vec3<f32>;  // agent position (world space)
-  @location(1) color    : vec4<f32>;  // agent color
-  @location(2) velocity : vec3<f32>;  // agent velocity
-  @location(3) mesh_pos : vec4<f32>;  // mesh vertex position (model space)
-  @location(4) mesh_uv  : vec2<f32>;  // mesh vertex uv
-  @location(5) mesh_nor : vec4<f32>;  // mesh vertex normal
-  @location(6) mesh_col : vec3<f32>;  // mesh vertex color
-};
+  @location(0) position : vec3<f32>,  // agent position (world space)
+  @location(1) color    : vec4<f32>,  // agent color
+  @location(2) velocity : vec3<f32>,  // agent velocity
+  @location(3) mesh_pos : vec4<f32>,  // mesh vertex position (model space)
+  @location(4) mesh_uv  : vec2<f32>,  // mesh vertex uv
+  @location(5) mesh_nor : vec4<f32>,  // mesh vertex normal
+  @location(6) mesh_col : vec3<f32>,  // mesh vertex color
+}
 
 struct VertexOutput {
-  @builtin(position) position : vec4<f32>;
-  @location(0)       color    : vec4<f32>;
-  @location(1)       mesh_pos : vec4<f32>;
-  @location(2)       mesh_uv  : vec2<f32>;
-  @location(3)       mesh_nor : vec4<f32>;
-  @location(4)       mesh_col : vec3<f32>;
-  @location(5)       shadowPos : vec3<f32>;
-};
+  @builtin(position) position : vec4<f32>,
+  @location(0)       color    : vec4<f32>,
+  @location(1)       mesh_pos : vec4<f32>,
+  @location(2)       mesh_uv  : vec2<f32>,
+  @location(3)       mesh_nor : vec4<f32>,
+  @location(4)       mesh_col : vec3<f32>,
+  @location(5)       shadowPos : vec3<f32>,
+}
 
-@stage(vertex)
+@vertex
 fn vs_main(in : VertexInput) -> VertexOutput {
 
   var vel = normalize(in.velocity);
@@ -65,7 +65,7 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 
   if(scene.shadowOn > 0.99) {
     // Shadow Mapping
-    let posFromLight : vec4<f32> = scene.lightViewProjMatrix * out.mesh_pos;
+    var posFromLight : vec4<f32> = scene.lightViewProjMatrix * out.mesh_pos;
 
     out.shadowPos = vec3<f32>(
       posFromLight.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5, 0.5),
@@ -82,9 +82,9 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 @group(0) @binding(1) var shadowSampler: sampler_comparison;
 @group(0) @binding(2) var shadowMap: texture_depth_2d;
 
-let ambientFactor : f32 = 0.2;
+const ambientFactor : f32 = 0.2;
 
-@stage(fragment)
+@fragment
 fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
 
   var visibility : f32 = 1.0;
@@ -92,7 +92,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
     visibility = 0.0;
     for (var y : i32 = -1 ; y <= 1 ; y = y + 1) {
         for (var x : i32 = -1 ; x <= 1 ; x = x + 1) {
-          let offset : vec2<f32> = vec2<f32>(
+          var offset : vec2<f32> = vec2<f32>(
             f32(x) * 0.00048828,
             f32(y) * 0.00048828);
 
@@ -106,12 +106,12 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
 
   var lightDir = normalize(scene.lightPos - in.mesh_pos.xyz);
   var lambertTerm = max(dot(lightDir, normalize(in.mesh_nor.xyz)), 0.0);
-  let lightingTerm = min(ambientFactor + visibility * lambertTerm, 1.0);
+  var lightingTerm = min(ambientFactor + visibility * lambertTerm, 1.0);
 
   var meshCol = vec4<f32>(in.mesh_col, 1.0);
   if (meshCol.r > 0.99 && meshCol.g > 0.99 && meshCol.b > 0.99){
     meshCol = in.color;
   }
-  let albedo = in.color * 0.3 + meshCol * 0.7;
+  var albedo = in.color * 0.3 + meshCol * 0.7;
   return albedo + lightingTerm * vec4<f32>(0.5);
 }

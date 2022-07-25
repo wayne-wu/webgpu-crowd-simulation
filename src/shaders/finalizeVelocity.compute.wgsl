@@ -11,15 +11,15 @@
 
 fn intersect_line(p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: vec2<f32>, n: ptr<function, vec2<f32>>) -> f32
 {
-  let s1 = p1 - p0;
-  let s2 = p3 - p2;
+  var s1 = p1 - p0;
+  var s2 = p3 - p2;
 
   var den = (-s2.x * s1.y + s1.x * s2.y);
   if (den < eps) { return -1.0; }  // colinear
 
   den = 1.0/den;
-  let s = (-s1.y * (p0.x - p2.x) + s1.x * (p0.y - p2.y)) * den;
-  let t = ( s2.x * (p0.y - p2.y) - s2.y * (p0.x - p2.x)) * den;
+  var s = (-s1.y * (p0.x - p2.x) + s1.x * (p0.y - p2.y)) * den;
+  var t = ( s2.x * (p0.y - p2.y) - s2.y * (p0.x - p2.x)) * den;
 
   if (s > 0.0 && s < 1.0 && t > 0.0 && t < 1.0)
   {
@@ -34,8 +34,8 @@ fn intersect_line(p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: vec2<f32>, n:
 fn obstacle_avoidance(agent: Agent, obstacle: Obstacle) -> vec3<f32>
 {
   // Create Model Matrix
-  let c = cos(obstacle.rot);
-  let s = sin(obstacle.rot);
+  var c = cos(obstacle.rot);
+  var s = sin(obstacle.rot);
   var m = mat4x4<f32>();
   m[0] = vec4<f32>(obstacle.scale.x*c, 0.0, -obstacle.scale.x*s, 0.0);
   m[1] = vec4<f32>(0.0, obstacle.scale.y, 0.0, 0.0);
@@ -43,7 +43,7 @@ fn obstacle_avoidance(agent: Agent, obstacle: Obstacle) -> vec3<f32>
   m[3] = vec4<f32>(obstacle.pos, 1.0);
 
   // Get Corner Points in World Position (Cube)
-  let l = 1.05;
+  const l = 1.05;
   var p1 = (m * vec4<f32>(l,0.0,l,1.0)).xz;
   var p2 = (m * vec4<f32>(l,0.0,-l,1.0)).xz;
   var p3 = (m * vec4<f32>(-l,0.0,-l,1.0)).xz;
@@ -84,15 +84,15 @@ fn getW(r : f32) -> f32 {
 
     if (eps <= r && r <= xsph_h) {
         w = 315.0 / (64.0 * 3.14159 * pow(xsph_h, 9.0));
-        let hmr = xsph_h * xsph_h - r * r;
+        var hmr = xsph_h * xsph_h - r * r;
         w = w * hmr * hmr * hmr;
     }
     return w;
 }
 
-@stage(compute) @workgroup_size(64)
+@compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  let idx = GlobalInvocationID.x;
+  var idx = GlobalInvocationID.x;
   var agent = agentData_r.agents[idx];
 
   // PBD: Get new velocity from corrected position
@@ -108,21 +108,21 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     return;
   }
 
-  let gridWidth = sim_params.gridWidth;
-  let gridHeight = gridWidth;//sim_params.gridWidth;
+  var gridWidth = sim_params.gridWidth;
+  var gridHeight = gridWidth;//sim_params.gridWidth;
   // TODO don't hardcode
-  let cellWidth = 1000.0 / gridWidth;
+  var cellWidth = 1000.0 / gridWidth;
   // compute cells that could conceivably contain neighbors
-  let bboxCorners = getBBoxCornerCells(agent.x.x,
+  var bboxCorners = getBBoxCornerCells(agent.x.x,
                                        agent.x.z,
                                        gridWidth,
                                        cellWidth,
                                        cohesionRadius);
 
-  let minX = bboxCorners[0];
-  let minY = bboxCorners[1];
-  let maxX = bboxCorners[2];
-  let maxY = bboxCorners[3];
+  var minX = bboxCorners[0];
+  var minY = bboxCorners[1];
+  var maxX = bboxCorners[2];
+  var maxY = bboxCorners[3];
 
   //for (var c : u32 = 0u; c < cellsToCheck; c = c + 1u ){
   for (var cellY = minY; cellY <= maxY; cellY = cellY + 1){
@@ -134,8 +134,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
       if (cellX < 0 || cellX >= i32(gridWidth)){
         continue;
       }
-      let cellIdx = cell2dto1d(cellX, cellY, gridWidth);
-      let cell : CellIndices = grid.cells[cellIdx];
+      var cellIdx = cell2dto1d(cellX, cellY, gridWidth);
+      var cell : CellIndices = grid.cells[cellIdx];
       for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
 
         if (idx == i) { 
@@ -169,8 +169,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
   // 4.6 Maximum Speed and Acceleration Limiting
 
-  let v_dir = normalize(agent.v);
-  let maxSpeed : f32 = 1.2*agent.speed;
+  var v_dir = normalize(agent.v);
+  var maxSpeed : f32 = 1.2*agent.speed;
   if(length(agent.v) > maxSpeed){
     agent.v = maxSpeed * v_dir;
   }

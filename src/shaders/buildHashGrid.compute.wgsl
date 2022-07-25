@@ -6,12 +6,12 @@
 @binding(1) @group(0) var<storage, read_write> agentData : Agents;
 @binding(3) @group(0) var<storage, read_write> grid : Grid;
 
-@stage(compute) @workgroup_size(64)
+@compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   // build Grid, an array of start/end indicies that indicate where
   // each grid cell starts/ends on an array of agents sorted by cell
 
-  let idx = GlobalInvocationID.x;
+  var idx = GlobalInvocationID.x;
 
   if (idx > u32(sim_params.numAgents) - 2u){
     // the idx doesn't correspond to a valid agent

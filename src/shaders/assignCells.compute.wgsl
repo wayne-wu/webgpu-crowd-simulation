@@ -6,11 +6,11 @@
 @binding(0) @group(0) var<uniform> sim_params : SimulationParams;
 @binding(1) @group(0) var<storage, read_write> agentData : Agents;
 
-@stage(compute) @workgroup_size(64)
+@compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   // Calculate which grid cell each agent is in and store it
 
-  let idx = GlobalInvocationID.x;
+  var idx = GlobalInvocationID.x;
   if (idx >= u32(sim_params.numAgents)){
     return;
   }
@@ -30,16 +30,16 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     return;
   }
 
-  let gridWidth = sim_params.gridWidth;
-  let gridHeight = sim_params.gridWidth;
-  let cellWidth = 1000.0 / gridWidth;
+  var gridWidth = sim_params.gridWidth;
+  var gridHeight = sim_params.gridWidth;
+  var cellWidth = 1000.0 / gridWidth;
 
-  let posCellSpace = worldSpacePosToCellSpace(agent.x.x, 
+  var posCellSpace = worldSpacePosToCellSpace(agent.x.x, 
                                               agent.x.z, 
                                               gridWidth, 
                                               cellWidth);
 
-  let cellXY = cellSpaceToCell2d(posCellSpace.x, posCellSpace.y, cellWidth);
+  var cellXY = cellSpaceToCell2d(posCellSpace.x, posCellSpace.y, cellWidth);
 
   var cellID = cell2dto1d(cellXY.x, cellXY.y, gridWidth);
 

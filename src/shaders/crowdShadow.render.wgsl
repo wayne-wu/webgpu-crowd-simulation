@@ -4,15 +4,15 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 struct VertexInput {
-  @location(0) position : vec3<f32>;  // agent position (world space)
-  @location(1) velocity : vec3<f32>;  // agent velocity
-  @location(2) mesh_pos : vec4<f32>;  // mesh vertex position (model space)
-};
+  @location(0) position : vec3<f32>,  // agent position (world space)
+  @location(1) velocity : vec3<f32>,  // agent velocity
+  @location(2) mesh_pos : vec4<f32>,  // mesh vertex position (model space)
+}
 
 @group(0) @binding(0) var<uniform> scene : Scene;
 @group(1) @binding(0) var<uniform> model : Model;
 
-@stage(vertex)
+@vertex
 fn vs_main(in : VertexInput)
      -> @builtin(position) vec4<f32> {
 
@@ -46,6 +46,6 @@ fn vs_main(in : VertexInput)
 }
 
 // ONLY USES VERTEX SHADER
-@stage(fragment)
+@fragment
 fn fs_main() {
 }

@@ -8,9 +8,9 @@
 @binding(3) @group(0) var<storage, read_write> grid : Grid;
 @binding(4) @group(0) var<storage, read_write> obstacleData : Obstacles;
 
-@stage(compute) @workgroup_size(64)
+@compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  let idx = GlobalInvocationID.x;
+  var idx = GlobalInvocationID.x;
 
   var agent = agentData_r.agents[idx];
   var totalDx = vec3<f32>(0.0, 0.0, 0.0);
@@ -22,22 +22,22 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     return;
   }
 
-  let gridWidth = sim_params.gridWidth;
-  let gridHeight = gridWidth;//sim_params.gridWidth;
+  var gridWidth = sim_params.gridWidth;
+  var gridHeight = gridWidth;//sim_params.gridWidth;
   // TODO don't hardcode
-  let cellWidth = 1000.0 / gridWidth;
+  var cellWidth = 1000.0 / gridWidth;
 
   // compute cells that could conceivably contain neighbors
-  let bboxCorners = getBBoxCornerCells(agent.x.x,
+  var bboxCorners = getBBoxCornerCells(agent.x.x,
                                        agent.x.z,
                                        gridWidth,
                                        cellWidth,
                                        nearRadius);
 
-  let minX = bboxCorners[0];
-  let minY = bboxCorners[1];
-  let maxX = bboxCorners[2];
-  let maxY = bboxCorners[3];
+  var minX = bboxCorners[0];
+  var minY = bboxCorners[1];
+  var maxX = bboxCorners[2];
+  var maxY = bboxCorners[3];
 
   for (var cellY = minY; cellY <= maxY; cellY = cellY + 1){
     if (cellY < 0 || cellY >= i32(gridHeight)){
@@ -48,8 +48,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
       if (cellX < 0 || cellX >= i32(gridWidth)){
         continue;
       }
-      let cellIdx = cell2dto1d(cellX, cellY, gridWidth);
-      let cell : CellIndices = grid.cells[cellIdx];
+      var cellIdx = cell2dto1d(cellX, cellY, gridWidth);
+      var cell : CellIndices = grid.cells[cellIdx];
 
       for (var i : u32 = cell.start; i <= cell.end; i = i + 1u) {
 
@@ -58,19 +58,19 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
           continue; 
         }
 
-        let agent_j = agentData_r.agents[i];
+        var agent_j = agentData_r.agents[i];
 
         var n = agent.xp - agent_j.xp;
-        let d = length(n);
+        var d = length(n);
         if (d > nearRadius){
           continue;
         }
 
-        let f = d - (agent.r + agent_j.r);
+        var f = d - (agent.r + agent_j.r);
         if (f < 0.0) {
           // 4.2 Short Range Collision
           n = normalize(n);
-          let w = agent.w / (agent.w + agent_j.w);
+          var w = agent.w / (agent.w + agent_j.w);
           var dx = -w * k_shortrange * f * n;
 
           if (friction) {
