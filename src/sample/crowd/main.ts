@@ -60,7 +60,7 @@ function getSortStepWGSL(numAgents : number, k : number, j : number, ){
     var k : u32 = ${k}u;
     var l = idx ^ j; 
     if (l > idx){
-      if (  (idx & k) == 0u && agentgt(idx,l) || (idx & k) != 0u && agentlt(idx, l)){
+      if (  ((idx & k) == 0u && agentgt(idx,l)) || ((idx & k) != 0u && agentlt(idx, l))){
         swap(idx, l);
       }
     }
