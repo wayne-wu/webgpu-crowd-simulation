@@ -54,6 +54,12 @@ const ambientFactor = 0.2;
 @fragment
 fn fs_platform(in : VertexOutput) -> @location(0) vec4<f32> {
 
+  var albedo = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  
+  if (scene.gridOn > 0.99){
+    albedo = textureSample(myTexture, mySampler, in.fragUV) + 1.4;
+  }
+
   var visibility : f32 = 1.0;
   if(scene.shadowOn > 0.99) {
     visibility = 0.0;
@@ -79,11 +85,6 @@ fn fs_platform(in : VertexOutput) -> @location(0) vec4<f32> {
 
   if (in.fragUV.x == -1.0){
     return vec4<f32>(0.9, 0.9, 0.9, 1.0);
-  }
-  var albedo = vec4<f32>(1.0, 1.0, 1.0, 1.0);
-  
-  if (scene.gridOn > 0.99){
-    albedo = textureSample(myTexture, mySampler, in.fragUV) + 1.4;
   }
 
   return 0.2*albedo + 0.8*vec4<f32>(lightingTerm * albedo.xyz, 1.0);;
