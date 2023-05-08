@@ -1,6 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // PBD Constraint Solving Compute Shader
 ////////////////////////////////////////////////////////////////////////////////
+@id(1000) override itr : u32;
 
 @binding(0) @group(0) var<uniform> sim_params : SimulationParams;
 @binding(1) @group(0) var<storage, read_write> agentData_r : Agents;
@@ -10,7 +11,6 @@
 
 fn long_range_constraint(agent: Agent, 
                          agent_j: Agent, 
-                         itr: i32, 
                          dt : f32,
                          count: ptr<function, i32>, 
                          totalDx: ptr<function, vec3<f32>>)
@@ -104,7 +104,6 @@ fn long_range_constraint(agent: Agent,
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   var idx = GlobalInvocationID.x;
 
-  var itr = sim_params.iteration;
   var dt = sim_params.deltaTime;
 
   var agent = agentData_r.agents[idx];
@@ -159,7 +158,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
           continue;
         }
 
-        long_range_constraint(agent, agent_j, itr, dt, &neighborCount, &totalDx);
+        long_range_constraint(agent, agent_j, dt, &neighborCount, &totalDx);
       }
     }
   }
