@@ -14,11 +14,12 @@ fn getVelocityFromPlanner(agent : Agent) -> vec3<f32> {
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
   var idx = GlobalInvocationID.x;
-  var agent = agentData.agents[idx];
 
   if (idx >= u32(sim_params.numAgents)){
     return;
   }
+
+  var agent = agentData.agents[idx];
 
   // velcity planning
   var vp = getVelocityFromPlanner(agent);
@@ -28,6 +29,34 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
   // explicit integration
   agent.xp = agent.x + sim_params.deltaTime * agent.v;
+
+  if (distance(agent.x, agent.goal) < 1.0){
+    //   // if we're close enough to the goal, (somewhat) smoothly place them 
+    //   // on the goal and set the cell to invalid so future computation largely
+    //   // ignores them 
+    //   agent.x = ((agent.x * 10.0) + agent.goal) / 11.0;
+    agent.cell = -2;
+    agent.c = rainbowCycle(sim_params.tick); 
+  }
+  else {
+    var gridWidth = sim_params.gridWidth;
+    var gridHeight = sim_params.gridWidth;
+    var cellWidth = 1000.0 / gridWidth;
+
+    var posCellSpace = worldSpacePosToCellSpace(agent.x.x, 
+                                                agent.x.z, 
+                                                gridWidth, 
+                                                cellWidth);
+
+    var cellXY = cellSpaceToCell2d(posCellSpace.x, posCellSpace.y, cellWidth);
+
+    agent.cell = cell2dto1d(cellXY.x, cellXY.y, gridWidth);
+    if (cellXY.x >= i32(gridWidth) || cellXY.y >= i32(gridHeight) ||
+        posCellSpace.x < 0.0 || posCellSpace.y < 0.0) {
+      agent.cell = -1; 
+      agent.c = vec4<f32>(0.5, 0.5, 0.5, 1.0);
+    }
+  }
 
   // Store the new agent value
   agentData.agents[idx] = agent;

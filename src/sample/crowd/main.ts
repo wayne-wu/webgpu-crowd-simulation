@@ -8,7 +8,6 @@ import { RenderBufferManager } from './renderUtils';
 import renderWGSL from '../../shaders/background.render.wgsl';
 import crowdWGSL from '../../shaders/crowd.render.wgsl';
 import explicitIntegrationWGSL from '../../shaders/explicitIntegration.compute.wgsl';
-import assignCellsWGSL from '../../shaders/assignCells.compute.wgsl';
 import bitonicSortWGSL from '../../shaders/bitonicSort.compute.wgsl';
 import buildHashGrid from '../../shaders/buildHashGrid.compute.wgsl';
 import contactSolveWGSL from '../../shaders/contactSolve.compute.wgsl';
@@ -50,8 +49,8 @@ function fillSortPipelineList(device,
     // set up sort pipelines
     // adapted from Wikipedia's non-recursive example of bitonic sort:
     // https://en.wikipedia.org/wiki/Bitonic_sorter
-    for (let k = 2; k <= numAgents; k *= 2){ // k is doubled every iteration
-      for (let j = k/2; j > 0; j = Math.floor(j/2)){ // j is halved at every iteration, with truncation of fractional parts
+    for (let k = 2; k <= numAgents; k <<= 1){ // k is doubled every iteration
+      for (let j = k >> 1; j > 0; j >>= 1){ // j is halved at every iteration, with truncation of fractional parts
         computePipelinesSort.push(
           device.createComputePipeline({
             layout: pipelineLayout,
@@ -250,7 +249,6 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   {
     const computeShadersPreSort = [
       headerWGSL + explicitIntegrationWGSL, 
-      headerWGSL + assignCellsWGSL,
     ];
     const computeShadersPostSort = [
       headerWGSL + buildHashGrid,
@@ -363,8 +361,17 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   }
 
   // get compute bind group
-  var computeBindGroup1 = compBuffManager.getBindGroup(false);
-  var computeBindGroup2 = compBuffManager.getBindGroup(true);
+  var computeBindGroup1 = compBuffManager.getBindGroup(false, "R1W2");
+  var computeBindGroup2 = compBuffManager.getBindGroup(true, "R2W1");
+
+  var computeBindGroup = computeBindGroup1;
+
+  function pingPongBuffer(){
+    if (computeBindGroup == computeBindGroup1)
+      computeBindGroup = computeBindGroup2;
+    else if (computeBindGroup == computeBindGroup2)
+      computeBindGroup = computeBindGroup1;
+  }
 
   var time = 0;
   function frame() {
@@ -459,9 +466,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         // reinitilize buffers based on the new number of agents
         compBuffManager.initBuffers();
 
-        computeBindGroup1 = compBuffManager.getBindGroup(false);  // READ agents1 WRITE agents2
-        computeBindGroup2 = compBuffManager.getBindGroup(true);   // READ agents2 WRITE agents1
-        
+        computeBindGroup1 = compBuffManager.getBindGroup(false, "R1W2");  // READ agents1 WRITE agents2
+        computeBindGroup2 = compBuffManager.getBindGroup(true, "R2W1");   // READ agents2 WRITE agents1
+        computeBindGroup = computeBindGroup1;
+
         // the number of steps in the sort pipeline is proportional
         // to log2 the number of agents, so reinitiliaze it
         fillSortPipelineList(device, 
@@ -478,14 +486,13 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         const computeWorkgroupCount = Math.ceil(compBuffManager.numAgents/64);
         const sortWorkgroupCount = Math.ceil(compBuffManager.numAgents/256);
 
-
         // write the parameters to the Uniform buffer for our compute shaders
         compBuffManager.writeSimParams(simulationParams);
 
         // execute each compute shader in the order they were pushed onto
         // the computePipelines array
         var passEncoder = command.beginComputePass();
-        passEncoder.setBindGroup(0, computeBindGroup1);
+        passEncoder.setBindGroup(0, computeBindGroup);
 
         //// ----- Compute Pass Before Sort -----
         for (let i = 0; i < computePipelinesPreSort.length; i++){
@@ -505,21 +512,16 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
           passEncoder.setPipeline(computePipelinesPostSort[i]);
           passEncoder.dispatchWorkgroups(computeWorkgroupCount);
         }      
-        
-        // Stability/Contact solve will write to different buffer
-        var computeBindGroup = computeBindGroup2;
 
+        pingPongBuffer();
+        
         // ----- Compute Pass Constraint Solve -----
         for (; i < 6; i++) {
           passEncoder.setPipeline(computePipelinesPostSort[i]);
           passEncoder.setBindGroup(0, computeBindGroup);
           passEncoder.dispatchWorkgroups(computeWorkgroupCount);
 
-          // ping-pong buffers
-          if(computeBindGroup == computeBindGroup1)
-            computeBindGroup = computeBindGroup2;
-          else if(computeBindGroup == computeBindGroup2)
-            computeBindGroup = computeBindGroup1;
+          pingPongBuffer();
         }      
 
         passEncoder.setBindGroup(0, computeBindGroup);
@@ -529,6 +531,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
           passEncoder.setPipeline(computePipelinesPostSort[i]);
           passEncoder.dispatchWorkgroups(computeWorkgroupCount);
         }
+
+        pingPongBuffer();
 
         passEncoder.end();
       }

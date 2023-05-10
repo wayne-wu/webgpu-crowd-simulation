@@ -277,8 +277,9 @@ export class ComputeBufferManager {
   });
   }
 
-  getBindGroup(flip: boolean = false){
+  getBindGroup(flip: boolean = false, label: string = ""){
     const computeBindGroup = this.device.createBindGroup({
+      label: label,
       layout: this.bindGroupLayout,
       entries: [
         {
