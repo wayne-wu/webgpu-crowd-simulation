@@ -130,9 +130,6 @@ const SampleLayout: React.FunctionComponent<
 
   const [error, setError] = useState<unknown | null>(null);
 
-  const canvasWidth = canvasRef.current != null ? canvasRef.current.width : 1600;
-  const canvasHeight = canvasRef.current != null ? canvasRef.current.height : 800;
-
   const [activeHash, setActiveHash] = useState<string | null>(null);
   useEffect(() => {
     if (currentHash) {
@@ -224,7 +221,7 @@ const SampleLayout: React.FunctionComponent<
           </>
         ) : null}
         </div>
-        <canvas ref={canvasRef} width={canvasWidth} height={canvasHeight}></canvas>
+        <canvas ref={canvasRef}></canvas>
       </div>
     </main>
   );

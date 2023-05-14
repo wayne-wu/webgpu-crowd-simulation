@@ -3,9 +3,10 @@
   text-align: center;
   position: relative;
   margin-top: 0px;
-  width: 100% !important;
-  height: 100% !important;
-  margin-left:0 !important;
+}
+
+.canvasContainer>canvas {
+  width: 100%;
 }
 
 nav.sourceFileNav ul {

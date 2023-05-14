@@ -74,11 +74,6 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   //                       Camera Setup                                //
   ///////////////////////////////////////////////////////////////////////
 
-  camera = new Camera(vec3.fromValues(50, 50, 50), vec3.fromValues(0, 0, 0));
-  aspect = canvasRef.current.width / canvasRef.current.height;
-  camera.setAspectRatio(aspect);
-  camera.updateProjectionMatrix();
-
   ////////////////////////////////////////////////////////////////////////
   //                        GUI Setup                                   //
   ////////////////////////////////////////////////////////////////////////
@@ -162,12 +157,15 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   if (canvasRef.current === null) return;
   const context = canvasRef.current.getContext('webgpu');
-
+  
   const devicePixelRatio = window.devicePixelRatio || 1;
   const presentationSize = [
     canvasRef.current.clientWidth * devicePixelRatio,
     canvasRef.current.clientHeight * devicePixelRatio,
   ];
+
+  canvasRef.current.width = presentationSize[0];
+  canvasRef.current.height = presentationSize[1];
 
   const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
@@ -175,8 +173,13 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     device,
     format: presentationFormat,
     alphaMode: 'opaque',
-    size: presentationSize,
   });
+
+  camera = new Camera(vec3.fromValues(50, 50, 50), vec3.fromValues(0, 0, 0));
+  aspect = canvasRef.current.width / canvasRef.current.height;
+  camera.setAspectRatio(aspect);
+  camera.updateProjectionMatrix();
+
 
   /////////////////////////////////////////////////////////////////////////
   //                     Compute Buffer Setup                            //
