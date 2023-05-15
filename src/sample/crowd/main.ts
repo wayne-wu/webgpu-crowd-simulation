@@ -22,7 +22,6 @@ import { render } from 'react-dom';
 
 let camera : Camera;
 let aspect : number;
-let resetSim : boolean;
 
 // Reset camera to original settings (gui function)
 function resetCameraFunc(x: number = 50, y: number = 50, z: number = 50) {
@@ -97,25 +96,23 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const simulationParams = {
     simulate: true,
     deltaTime: 0.02,
+    stabilityIterations: 1,
+    constraintIterations: 6,
     numObstacles : 1,
     avoidanceModel: false,
     lookAhead : 6.0,
     gridWidth: guiParams.gridWidth,
-    resetSimulation: () => { resetSim = true; }
+    resetSimulation: resetSim,
   };
 
   // GUI GLOBALS ------------------------------------------------------------
-  let prevGridWidth = guiParams.gridWidth;
-  let prevNumAgents = sceneParams['2^x agents'];
-  let prevTestScene = TestScene.DENSE;
-  let prevModel = 'Duck';
   // default don't display slider to select number of agents -- will re-add if scene requires
   let numAgentsSliderDisplayed = false;
-  resetSim = true;
+
 
   // GUI ELEMENTS -----------------------------------------------------------
   const gridFolder = gui.addFolder("Grid");
-  gridFolder.add(guiParams, 'gridWidth', 1, 5000, 1);
+  gridFolder.add(guiParams, 'gridWidth', 1, 5000, 1).onFinishChange(resetSim);
   gridFolder.add(guiParams, 'gridOn');
   gridFolder.open();
 
@@ -127,8 +124,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   models.push('Cube');
 
   const sceneFolder = gui.addFolder("Scene");
-  sceneFolder.add(sceneParams, 'scene', Object.values(TestScene));
-  sceneFolder.add(sceneParams, 'model', models);
+  sceneFolder.add(sceneParams, 'scene', Object.values(TestScene)).onFinishChange(resetSim);
+  sceneFolder.add(sceneParams, 'model', models).onFinishChange(resetRender);
   sceneFolder.add(sceneParams, 'showGoals');
   sceneFolder.add(sceneParams, 'shadowOn');
   sceneFolder.add(sceneParams, 'total agents');
@@ -137,6 +134,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   const simFolder = gui.addFolder("Simulation");
   simFolder.add(simulationParams, 'simulate');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
+  simFolder.add(simulationParams, 'stabilityIterations', 1, 10, 1).onFinishChange(resetSim);
+  simFolder.add(simulationParams, 'constraintIterations', 1, 10, 1).onFinishChange(resetSim);
   simFolder.add(simulationParams, 'lookAhead', 3.0, 15.0, 1.0);
   simFolder.add(simulationParams, 'avoidanceModel');
   simFolder.add(simulationParams, 'resetSimulation');
@@ -223,46 +222,33 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   var platformWidth = 50; // global for platform width, test scenes change this
 
-  let bufManagerExists = false;
-  if (sceneParams.model == 'Cube'){
-    const mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
-    mesh.scale = 0.2;
-    renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
-      presentationFormat, presentationSize,
-      compBuffManager, mesh, gridTexture, sampler, 
-      sceneParams.showGoals);
-    bufManagerExists = true;
-  }
-  else{
-    const modelData = meshDictionary[sceneParams.model];
-    loadModel(modelData.filename, device).then((mesh : Mesh) => {
-      mesh.scale = modelData.scale;
-      renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
-        presentationFormat, presentationSize,
-        compBuffManager, mesh, gridTexture, sampler, 
-        sceneParams.showGoals);
-      
-      bufManagerExists = true;
-    });
-  }
-
   //////////////////////////////////////////////////////////////////////////////
   // Create Compute Pipelines
   //////////////////////////////////////////////////////////////////////////////
-  {
-    const computeShadersPreSort = [
-      headerWGSL + explicitIntegrationWGSL, 
-    ];
-    const computeShadersPostSort = [
-      headerWGSL + buildHashGrid,
-      headerWGSL + contactSolveWGSL, 
-      headerWGSL + constraintSolveWGSL, 
-      headerWGSL + finalizeVelocityWGSL
-    ];
-    var computePipelinesPreSort = [];
-    var computePipelinesSort = [];
-    var computePipelinesPostSort = [];
+  const computeShadersPreSort = [
+    headerWGSL + explicitIntegrationWGSL, 
+  ];
+  const computeShadersPostSort = [
+    headerWGSL + buildHashGrid,
+    headerWGSL + contactSolveWGSL, 
+    headerWGSL + constraintSolveWGSL, 
+    headerWGSL + finalizeVelocityWGSL
+  ];
+  var computePipelinesPreSort = [];
+  var computePipelinesSort = [];
+  var computePipelinesPostSort = [];
 
+  var computeWorkgroupCount = 0;
+  var sortWorkgroupCount = 0;
+
+  function createComputePipelines() {
+
+    computeWorkgroupCount = Math.ceil(compBuffManager.numAgents/64);
+    sortWorkgroupCount = Math.ceil(compBuffManager.numAgents/256);
+
+    computePipelinesPreSort.splice(0);
+    computePipelinesSort.splice(0);
+    computePipelinesPostSort.splice(0);
 
     var pipelineLayout = device.createPipelineLayout({
       bindGroupLayouts: [compBuffManager.bindGroupLayout]
@@ -285,9 +271,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     // set up sort pipelines
     fillSortPipelineList(device, 
-                         compBuffManager.numAgents, 
-                         computePipelinesSort, 
-                         compBuffManager);
+                          compBuffManager.numAgents, 
+                          computePipelinesSort, 
+                          compBuffManager);
 
     // set up post sort pipelines
     let i = 0;
@@ -308,7 +294,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     var shaderModule = device.createShaderModule({
       code: computeShadersPostSort[i++],
     });
-    for(let j = 0; j < 6; j++){
+    for(let j = 0; j < simulationParams.constraintIterations; j++){
       computePipelinesPostSort.push( 
         device.createComputePipeline({
         layout: pipelineLayout,
@@ -336,7 +322,75 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       })
       );
     }
+  }
 
+  function resetRender(){
+
+    renderBuffManager = null;
+    if (sceneParams.model == 'Cube'){
+      const mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
+      mesh.scale = 0.2;
+      renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
+        presentationFormat, presentationSize,
+        compBuffManager, mesh, gridTexture, sampler, 
+        sceneParams.showGoals);
+    } else {
+    var modelData = meshDictionary[sceneParams.model];
+    loadModel(modelData.filename, device).then((mesh : Mesh) => {
+      mesh.scale = modelData.scale;
+      renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
+        presentationFormat, presentationSize,
+        compBuffManager, mesh, gridTexture, sampler, 
+        sceneParams.showGoals);
+      });
+    }
+  }
+
+  function resetSim(){
+
+    switch(sceneParams.scene) {
+      case TestScene.PROXIMAL:
+        setTestScene(vec3.fromValues(5, 10, 5), false, 6, 30, 0, true);
+        break;
+      case TestScene.BOTTLENECK:
+        setTestScene(vec3.fromValues(20, 20, 20), false, 9, 63, 2, true);
+        break;
+      case TestScene.DENSE:
+        setTestScene(vec3.fromValues(80, 75, 0), true, 15, 1000, 0, false);
+        break;
+      case TestScene.SPARSE:
+        setTestScene(vec3.fromValues(50, 50, 50), true, 12, 100, 0, false);
+        break;
+      case TestScene.OBSTACLES:
+        setTestScene(vec3.fromValues(50, 50, 50), false, 10, 50, 5, true);
+        break;
+      case TestScene.CIRCLE:
+        setTestScene(vec3.fromValues(5, 20, 5), false, 6, 20, 0, true);
+        break;
+      case TestScene.DISPERSED:
+        setTestScene(vec3.fromValues(0, 60, 0), false, 11, 100, 0, false);
+        break;
+    }
+
+    compBuffManager.testScene = sceneParams.scene;
+    compBuffManager.numValidAgents = 1<<sceneParams['2^x agents'];
+    totalAgentsDOM.innerText = compBuffManager.numValidAgents + "";
+
+    compBuffManager.gridWidth = simulationParams.gridWidth;
+
+    // NOTE: Can't have 0 binding size so we just set to 1 dummy if no obstacles
+    compBuffManager.numObstacles = Math.max(simulationParams.numObstacles, 1);
+
+    // reinitilize buffers based on the new number of agents
+    compBuffManager.initBuffers();
+
+    computeBindGroup1 = compBuffManager.getBindGroup(false, "R1W2");  // READ agents1 WRITE agents2
+    computeBindGroup2 = compBuffManager.getBindGroup(true, "R2W1");   // READ agents2 WRITE agents1
+    computeBindGroup = computeBindGroup1;
+
+    // the number of steps in the sort pipeline is proportional
+    // to log2 the number of agents, so reinitiliaze it
+    createComputePipelines();
   }
 
   function setTestScene(camPos: vec3, displayAgentSlider: boolean, numAgents: number, 
@@ -376,118 +430,25 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       computeBindGroup = computeBindGroup1;
   }
 
+  resetSim();
+  resetRender();
+
   var time = 0;
   function frame() {
+
     time++;
     stats.begin();
+
     // Sample is no longer the active page.
     if (!canvasRef.current) return;
-
-    // Compute new grid lines if there's a change in the gui
-    if (prevGridWidth != guiParams.gridWidth) {
-      resetSim = true;
-      simulationParams.gridWidth = guiParams.gridWidth;
-      prevGridWidth = guiParams.gridWidth;
-    }
-
-    if (prevModel != sceneParams.model) {
-      bufManagerExists = false;
-      prevModel = sceneParams.model;
-      if (sceneParams.model == 'Cube'){
-        const mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
-        mesh.scale = 0.2;
-        renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
-          presentationFormat, presentationSize,
-          compBuffManager, mesh, gridTexture, sampler, 
-          sceneParams.showGoals);
-        bufManagerExists = true;
-      } else {
-      var modelData = meshDictionary[sceneParams.model];
-      loadModel(modelData.filename, device).then((mesh : Mesh) => {
-        mesh.scale = modelData.scale;
-        renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
-          presentationFormat, presentationSize,
-          compBuffManager, mesh, gridTexture, sampler, 
-          sceneParams.showGoals);
-    
-        bufManagerExists = true;
-      });
-    }
-    }
 
     camera.update();
 
     //------------------ Compute Calls ------------------------ //
     {
-      if (prevNumAgents != sceneParams['2^x agents']) {
-        // NOTE: we also reset the sim if the grid width changes
-        // which is checked just above this
-        prevNumAgents = sceneParams['2^x agents'];
-        totalAgentsDOM.innerText = Math.pow(2, prevNumAgents) + "";
-        // set reset sim to true so that simulation starts over
-        // and agents are redistributed
-        resetSim = true;
-      }
-
-      if (prevTestScene != sceneParams.scene) {
-        prevTestScene = sceneParams.scene;
-        switch(sceneParams.scene) {
-          case TestScene.PROXIMAL:
-            setTestScene(vec3.fromValues(5, 10, 5), false, 6, 30, 0, true);
-            break;
-          case TestScene.BOTTLENECK:
-            setTestScene(vec3.fromValues(20, 20, 20), false, 9, 63, 2, true);
-            break;
-          case TestScene.DENSE:
-            setTestScene(vec3.fromValues(80, 75, 0), true, 15, 1000, 0, false);
-            break;
-          case TestScene.SPARSE:
-            setTestScene(vec3.fromValues(50, 50, 50), true, 12, 100, 0, false);
-            break;
-          case TestScene.OBSTACLES:
-            setTestScene(vec3.fromValues(50, 50, 50), false, 10, 50, 5, true);
-            break;
-          case TestScene.CIRCLE:
-            setTestScene(vec3.fromValues(5, 20, 5), false, 6, 20, 0, true);
-            break;
-          case TestScene.DISPERSED:
-            setTestScene(vec3.fromValues(0, 60, 0), false, 11, 100, 0, false);
-            break;
-        }
-        resetSim = true;
-      }
-
-      // recompute agent buffer if resetSim button pressed
-      if (resetSim) {
-        compBuffManager.testScene = sceneParams.scene;
-        compBuffManager.numValidAgents = 1<<sceneParams['2^x agents'];
-        compBuffManager.gridWidth = simulationParams.gridWidth;
-
-        // NOTE: Can't have 0 binding size so we just set to 1 dummy if no obstacles
-        compBuffManager.numObstacles = Math.max(simulationParams.numObstacles, 1);
-
-        // reinitilize buffers based on the new number of agents
-        compBuffManager.initBuffers();
-
-        computeBindGroup1 = compBuffManager.getBindGroup(false, "R1W2");  // READ agents1 WRITE agents2
-        computeBindGroup2 = compBuffManager.getBindGroup(true, "R2W1");   // READ agents2 WRITE agents1
-        computeBindGroup = computeBindGroup1;
-
-        // the number of steps in the sort pipeline is proportional
-        // to log2 the number of agents, so reinitiliaze it
-        fillSortPipelineList(device, 
-                            compBuffManager.numAgents, 
-                            computePipelinesSort, 
-                            compBuffManager);
-        resetSim = false;
-      }
-
       var command = device.createCommandEncoder();
 
       if(simulationParams.simulate) {
-
-        const computeWorkgroupCount = Math.ceil(compBuffManager.numAgents/64);
-        const sortWorkgroupCount = Math.ceil(compBuffManager.numAgents/256);
 
         // write the parameters to the Uniform buffer for our compute shaders
         compBuffManager.writeSimParams(simulationParams);
@@ -511,16 +472,23 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         
         // ----- Compute Pass Post Sort 1 -----
         let i = 0;
-        for (;i < 2 /* constraint shader index */; i++){
+        for (;i < 1 /* constraint shader index */; i++){
           passEncoder.setPipeline(computePipelinesPostSort[i]);
           passEncoder.dispatchWorkgroups(computeWorkgroupCount);
-        }      
+        }     
+        
+        // Stability Iterations
+        passEncoder.setPipeline(computePipelinesPostSort[i++]);
+        for (let j = 0; j < simulationParams.stabilityIterations; j++){
+          passEncoder.setBindGroup(0, computeBindGroup);
+          passEncoder.dispatchWorkgroups(computeWorkgroupCount);
 
-        pingPongBuffer();
+          pingPongBuffer();
+        }
         
         // ----- Compute Pass Constraint Solve -----
-        for (; i < 6; i++) {
-          passEncoder.setPipeline(computePipelinesPostSort[i]);
+        for (let j = 0; j < simulationParams.constraintIterations && i < computePipelinesPostSort.length; j++) {
+          passEncoder.setPipeline(computePipelinesPostSort[i++]);
           passEncoder.setBindGroup(0, computeBindGroup);
           passEncoder.dispatchWorkgroups(computeWorkgroupCount);
 
@@ -542,7 +510,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     }
 
     // ------------------ Render Calls ------------------------- //
-    if (bufManagerExists) {
+    if (renderBuffManager != null) {
 
       renderBuffManager.updateSceneUBO(camera, guiParams.gridOn, time, sceneParams.shadowOn);
       
