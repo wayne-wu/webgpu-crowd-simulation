@@ -7,7 +7,7 @@
 @binding(1) @group(0) var<storage, read_write> agentData_r : Agents;
 @binding(2) @group(0) var<storage, read_write> agentData_w : Agents;
 @binding(3) @group(0) var<storage, read_write> grid : Grid;
-@binding(4) @group(0) var<storage, read_write> obstacleData : Obstacles;
+@binding(4) @group(0) var<storage, read> obstacleData : Obstacles;
 
 fn long_range_constraint(agent: Agent, 
                          agent_j: Agent, 

@@ -33,6 +33,7 @@ export class ComputeBufferManager {
 
   // buffer sizes
   simulationUBOBufferSize : number;
+  simParamsData : Float32Array;
 
   // buffer item sizes (for buffers that might change size)
   agentInstanceSize : number;
@@ -115,6 +116,7 @@ export class ComputeBufferManager {
       1 * 4 + // LR radius
       1 * 4 + // padding
       0;
+    this.simParamsData = new Float32Array(this.simulationUBOBufferSize / 4);
 
     this.cellInstanceSize = 
       2 * 4 +   // 2 u32 indices per pair of start/end ptrs
@@ -211,18 +213,20 @@ export class ComputeBufferManager {
   writeSimParams(simulationParams){
     this.tick++;
     this.tick %= 1 << 15;
+
+    this.simParamsData[0] = simulationParams.simulate ? simulationParams.deltaTime : 0.0;
+    this.simParamsData[1] = simulationParams.avoidanceModel ? 1.0 : 0.0;
+    this.simParamsData[2] = this.numAgents;
+    this.simParamsData[3] = this.gridWidth;
+    this.simParamsData[4] = 0.0; // iteration is managed by specialized pipelines
+    this.simParamsData[5] = this.tick;
+    this.simParamsData[6] = simulationParams.lookAhead;
+    this.simParamsData[7] = 0.0;
+
     this.device.queue.writeBuffer(
       this.simulationUBOBuffer,
       0,
-      new Float32Array([
-        simulationParams.simulate ? simulationParams.deltaTime : 0.0,
-        simulationParams.avoidanceModel,
-        this.numAgents,
-        this.gridWidth,
-        0.0,
-        this.tick,
-        simulationParams.lookAhead,
-      ])
+      this.simParamsData
     );
   }
 
@@ -272,7 +276,7 @@ export class ComputeBufferManager {
         binding: 4, // obstacleBuffer
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
-          type: "storage"
+          type: "read-only-storage"
         }
       }
     ]

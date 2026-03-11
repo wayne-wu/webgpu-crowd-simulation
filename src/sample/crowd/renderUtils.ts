@@ -77,12 +77,17 @@ export class RenderBufferManager {
   shadowDepthTextureView  : GPUTextureView;
 
   mesh                    : Mesh;
+  sceneData               : Float32Array;
+  cameraViewProjScratch   : mat4;
+  platformModelScratch    : mat4;
+  lastPlatformWidth       : number;
 
   constructor (device: GPUDevice, gridWidth: number, presentationFormat: GPUTextureFormat, presentationSize, cbm: ComputeBufferManager, 
                mesh : Mesh, gridTexture: GPUTexture, sampler, showGoals: boolean) 
   {
     this.device = device;
     this.mesh = mesh;
+    this.lastPlatformWidth = -1;
     this.initVBOs(gridWidth, showGoals);
     this.initBindGroupLayouts();
     this.initUBOs();
@@ -195,6 +200,9 @@ export class RenderBufferManager {
       0;
     
     this.sceneUBO = createUBO(this.device, sceneBufferSize);
+    this.sceneData = new Float32Array(sceneBufferSize / 4);
+    this.cameraViewProjScratch = mat4.create();
+    this.platformModelScratch = mat4.create();
     this.platformModelUBO = createUBO(this.device, 4 * 16);
     this.crowdModelUBO = createUBO(this.device, 4 * 16);
 
@@ -221,8 +229,9 @@ export class RenderBufferManager {
     
       const lightViewProjMatrix = mat4.create();
       mat4.multiply(lightViewProjMatrix, lightProjectionMatrix, lightViewMatrix);
-      this.device.queue.writeBuffer(this.sceneUBO, 0, lightViewProjMatrix as Float32Array);
-      this.device.queue.writeBuffer(this.sceneUBO, 2 * 4 * 16, lightPosition as Float32Array);
+      this.sceneData.set(lightViewProjMatrix as Float32Array, 0);
+      this.sceneData.set(lightPosition as Float32Array, 32);
+      this.device.queue.writeBuffer(this.sceneUBO, 0, this.sceneData);
     }
     {
       const modelMatrix = mat4.create();
@@ -582,10 +591,14 @@ export class RenderBufferManager {
   }
 
   drawPlatform(device: GPUDevice, passEncoder: GPURenderPassEncoder, platformWidth) {
-    const modelMatrix = mat4.create();
-    mat4.identity(modelMatrix);
-    mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(platformWidth, 0.1, platformWidth));
-    this.device.queue.writeBuffer(this.platformModelUBO, 0, modelMatrix as Float32Array);
+    if (platformWidth !== this.lastPlatformWidth) {
+      mat4.identity(this.platformModelScratch);
+      this.platformModelScratch[0] = platformWidth;
+      this.platformModelScratch[5] = 0.1;
+      this.platformModelScratch[10] = platformWidth;
+      this.device.queue.writeBuffer(this.platformModelUBO, 0, this.platformModelScratch as Float32Array);
+      this.lastPlatformWidth = platformWidth;
+    }
 
     passEncoder.setPipeline(this.platformPipeline);
     passEncoder.setBindGroup(0, this.platformBindGroup);
@@ -631,28 +644,15 @@ export class RenderBufferManager {
   } 
 
   updateSceneUBO(camera: Camera, gridOn: boolean, time: number, shadowOn: boolean){
-    const vp = mat4.create();
-    mat4.multiply(vp, camera.projectionMatrix, camera.viewMatrix);
-    this.device.queue.writeBuffer(
-      this.sceneUBO,
-      // skip lightViewProj
-      4 * 16,
-      vp as Float32Array);
-    this.device.queue.writeBuffer(
-      this.sceneUBO,
-      // lightViewProj, camViewProj, lightPos
-      2 * 4 * 16 + 3 * 4,
-      new Float32Array([gridOn ? 1.0 : 0.0]));
-    this.device.queue.writeBuffer(
-      this.sceneUBO,
-      // lightViewProj, camViewProj, lightPos, gridOn
-      2 * 4 * 16 + 4 * 4,
-      new Float32Array([camera.controls.eye[0], camera.controls.eye[1], camera.controls.eye[2]]));
-    this.device.queue.writeBuffer(
-      this.sceneUBO,
-      // lightViewProj, camViewProj, lightPos, gridOn, camPos
-      2 * 4 * 16 + 4 * 4 + 3 * 4,
-      new Float32Array([time, shadowOn ? 1.0: 0.0]));
+    mat4.multiply(this.cameraViewProjScratch, camera.projectionMatrix, camera.viewMatrix);
+    this.sceneData.set(this.cameraViewProjScratch as Float32Array, 16);
+    this.sceneData[35] = gridOn ? 1.0 : 0.0;
+    this.sceneData[36] = camera.controls.eye[0];
+    this.sceneData[37] = camera.controls.eye[1];
+    this.sceneData[38] = camera.controls.eye[2];
+    this.sceneData[39] = time;
+    this.sceneData[40] = shadowOn ? 1.0 : 0.0;
+    this.device.queue.writeBuffer(this.sceneUBO, 0, this.sceneData);
   }
 }
 

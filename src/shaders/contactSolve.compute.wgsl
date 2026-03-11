@@ -6,7 +6,7 @@
 @binding(1) @group(0) var<storage, read_write> agentData_r : Agents;
 @binding(2) @group(0) var<storage, read_write> agentData_w : Agents;
 @binding(3) @group(0) var<storage, read_write> grid : Grid;
-@binding(4) @group(0) var<storage, read_write> obstacleData : Obstacles;
+@binding(4) @group(0) var<storage, read> obstacleData : Obstacles;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
