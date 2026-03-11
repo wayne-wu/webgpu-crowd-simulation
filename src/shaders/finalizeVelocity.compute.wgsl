@@ -104,6 +104,9 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
   if (agent.cell < 0){
     // ignore invalid cells
+    agent.dir = normalize(agent.v);
+    var up = vec3<f32>(0.0, 1.0, 0.0);
+    agent.xp = normalize(cross(agent.dir, up));
     agentData_w.agents[idx] = agent;
     return;
   }
@@ -179,7 +182,14 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   // Reintegrate here so that the position doesn't jump between frames
   agent.x = agent.x + agent.v * sim_params.deltaTime;
 
+  // Explicitly set the direction of the agent based on velocity and previous direction
   agent.dir = dir_blending * normalize(agent.dir) + (1.0 - dir_blending) * v_dir;
+  agent.dir = normalize(agent.dir);
+
+  // We use xp to pre-compute the right direction for orientation
+  // xp will be overwritten by the first compute shader anyway
+  var up = vec3<f32>(0.0, 1.0, 0.0);
+  agent.xp = normalize(cross(agent.dir, up));
 
   // Store the new agent value
   agentData_w.agents[idx] = agent;

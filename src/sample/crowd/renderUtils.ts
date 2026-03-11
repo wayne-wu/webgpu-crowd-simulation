@@ -386,6 +386,12 @@ export class RenderBufferManager {
             offset: cbm.agentVelocityOffset,
             format: 'float32x3'
           },
+          {
+            // precomputed right vector (stored in xp)
+            shaderLocation: 7,
+            offset: cbm.agentRightOffset,
+            format: 'float32x3'
+          },
         ],
       },
       {
@@ -445,6 +451,12 @@ export class RenderBufferManager {
             // velocity
             shaderLocation: 1,
             offset: cbm.agentVelocityOffset,
+            format: 'float32x3'
+          },
+          {
+            // precomputed right vector (stored in xp)
+            shaderLocation: 3,
+            offset: cbm.agentRightOffset,
             format: 'float32x3'
           },
         ],

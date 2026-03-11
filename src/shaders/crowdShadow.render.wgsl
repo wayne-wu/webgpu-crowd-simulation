@@ -7,6 +7,7 @@ struct VertexInput {
   @location(0) position : vec3<f32>,  // agent position (world space)
   @location(1) velocity : vec3<f32>,  // agent velocity
   @location(2) mesh_pos : vec4<f32>,  // mesh vertex position (model space)
+  @location(3) right    : vec3<f32>,  // agent right direction
 }
 
 @group(0) @binding(0) var<uniform> scene : Scene;
@@ -26,12 +27,9 @@ fn vs_main(in : VertexInput)
   scale[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
   var rot = mat4x4<f32>();
-  var forward = vel;
-  var up = vec3<f32>(0.0, 1.0, 0.0);
-  var right = normalize(cross(forward, up));
-  rot[0] = vec4<f32>(right, 0.0);
-  rot[1] = vec4<f32>(up, 0.0);
-  rot[2] = vec4<f32>(forward, 0.0);
+  rot[0] = vec4<f32>(in.right, 0.0);
+  rot[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
+  rot[2] = vec4<f32>(in.velocity, 0.0);
   rot[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
   var trans = mat4x4<f32>();

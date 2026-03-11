@@ -514,7 +514,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
       renderBuffManager.updateSceneUBO(camera, guiParams.gridOn, time, sceneParams.shadowOn);
       
-      const agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents1Buffer : compBuffManager.agents2Buffer;
+      const agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents2Buffer : compBuffManager.agents1Buffer;
 
       if(sceneParams.shadowOn)
         renderBuffManager.drawCrowdShadow(device, command, agentsBuffer, compBuffManager.numAgents);

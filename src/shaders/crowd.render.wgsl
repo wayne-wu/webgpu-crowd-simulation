@@ -13,6 +13,7 @@ struct VertexInput {
   @location(4) mesh_uv  : vec2<f32>,  // mesh vertex uv
   @location(5) mesh_nor : vec4<f32>,  // mesh vertex normal
   @location(6) mesh_col : vec3<f32>,  // mesh vertex color
+  @location(7) right    : vec3<f32>,  // agent right dir
 }
 
 struct VertexOutput {
@@ -28,8 +29,6 @@ struct VertexOutput {
 @vertex
 fn vs_main(in : VertexInput) -> VertexOutput {
 
-  var vel = normalize(in.velocity);
-
   var instance = mat4x4<f32>();
   var scale = mat4x4<f32>();
   scale[0] = vec4<f32>(1.0, 0.0, 0.0, 0.0);
@@ -38,12 +37,9 @@ fn vs_main(in : VertexInput) -> VertexOutput {
   scale[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
   var rot = mat4x4<f32>();
-  var forward = vel;
-  var up = vec3<f32>(0.0, 1.0, 0.0);
-  var right = normalize(cross(forward, up));
-  rot[0] = vec4<f32>(right, 0.0);
-  rot[1] = vec4<f32>(up, 0.0);
-  rot[2] = vec4<f32>(forward, 0.0);
+  rot[0] = vec4<f32>(in.right, 0.0);
+  rot[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
+  rot[2] = vec4<f32>(in.velocity, 0.0);
   rot[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
   var trans = mat4x4<f32>();
