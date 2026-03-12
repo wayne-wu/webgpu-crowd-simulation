@@ -96,6 +96,11 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
   const simulationParams = {
     simulate: true,
+    step: () => {
+      if (!simulationParams.simulate) {
+        pendingSingleStep = true;
+      }
+    },
     deltaTime: 0.02,
     stabilityIterations: 1,
     constraintIterations: 6,
@@ -109,6 +114,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   // GUI GLOBALS ------------------------------------------------------------
   // default don't display slider to select number of agents -- will re-add if scene requires
   let numAgentsSliderDisplayed = false;
+  let pendingSingleStep = false;
 
 
   // GUI ELEMENTS -----------------------------------------------------------
@@ -133,14 +139,28 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   sceneFolder.open();
   
   const simFolder = gui.addFolder("Simulation");
-  simFolder.add(simulationParams, 'simulate');
+  const simulateController = simFolder.add(simulationParams, 'simulate');
+  const stepController = simFolder.add(simulationParams, 'step');
+  simFolder.add(simulationParams, 'resetSimulation');
   simFolder.add(simulationParams, 'deltaTime', 0.0001, 1.0, 0.0001);
   simFolder.add(simulationParams, 'stabilityIterations', 1, 10, 1).onFinishChange(resetSim);
   simFolder.add(simulationParams, 'constraintIterations', 1, 10, 1).onFinishChange(resetSim);
   simFolder.add(simulationParams, 'lookAhead', 3.0, 15.0, 1.0);
   simFolder.add(simulationParams, 'avoidanceModel');
-  simFolder.add(simulationParams, 'resetSimulation');
+
   simFolder.open();
+
+  function updateStepControllerState() {
+    const disabled = simulationParams.simulate;
+    const style = stepController.domElement.style;
+    style.pointerEvents = disabled ? 'none' : 'auto';
+    style.opacity = disabled ? '0.5' : '1.0';
+  }
+
+  simulateController.onChange(() => {
+    updateStepControllerState();
+  });
+  updateStepControllerState();
 
   const debugFolder = gui.addFolder("Debug");
   debugFolder.add(sceneParams, 'debugCell');
@@ -453,10 +473,11 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     {
       var command = device.createCommandEncoder();
 
-      if(simulationParams.simulate) {
+      const shouldRunSimulation = simulationParams.simulate || pendingSingleStep;
+      if(shouldRunSimulation) {
 
         // write the parameters to the Uniform buffer for our compute shaders
-        compBuffManager.writeSimParams(simulationParams);
+        compBuffManager.writeSimParams(simulationParams, true);
 
         // execute each compute shader in the order they were pushed onto
         // the computePipelines array
@@ -511,6 +532,8 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
         pingPongBuffer();
 
         passEncoder.end();
+
+        pendingSingleStep = false;
       }
     }
 

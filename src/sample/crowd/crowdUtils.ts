@@ -210,11 +210,11 @@ export class ComputeBufferManager {
     this.goalsBuffer.unmap();
   }
 
-  writeSimParams(simulationParams){
+  writeSimParams(simulationParams, runSimulation: boolean = simulationParams.simulate){
     this.tick++;
     this.tick %= 1 << 15;
 
-    this.simParamsData[0] = simulationParams.simulate ? simulationParams.deltaTime : 0.0;
+    this.simParamsData[0] = runSimulation ? simulationParams.deltaTime : 0.0;
     this.simParamsData[1] = simulationParams.avoidanceModel ? 1.0 : 0.0;
     this.simParamsData[2] = this.numAgents;
     this.simParamsData[3] = this.gridWidth;
