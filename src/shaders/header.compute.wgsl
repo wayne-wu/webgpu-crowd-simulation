@@ -29,6 +29,7 @@ struct SimulationParams {
   iteration : i32,
   tick      : f32,
   farRadius : f32,
+  debugCell : f32,
 }
 
 struct Agent {

@@ -14,6 +14,7 @@ struct VertexInput {
   @location(5) mesh_nor : vec4<f32>,  // mesh vertex normal
   @location(6) mesh_col : vec3<f32>,  // mesh vertex color
   @location(7) right    : vec3<f32>,  // agent right dir
+  @location(8) cell     : i32,        // agent spatial hash cell
 }
 
 struct VertexOutput {
@@ -24,6 +25,7 @@ struct VertexOutput {
   @location(3)       mesh_nor : vec4<f32>,
   @location(4)       mesh_col : vec3<f32>,
   @location(5)       shadowPos : vec3<f32>,
+  @location(6) @interpolate(flat) cell : i32,
 }
 
 @vertex
@@ -58,6 +60,7 @@ fn vs_main(in : VertexInput) -> VertexOutput {
 
   out.mesh_nor = instance * model.modelMatrix * in.mesh_nor;
   out.mesh_col = in.mesh_col;
+  out.cell = in.cell;
 
   if(scene.shadowOn > 0.99) {
     // Shadow Mapping
@@ -70,6 +73,16 @@ fn vs_main(in : VertexInput) -> VertexOutput {
   }
 
   return out;
+}
+
+fn hash_color(cell: i32) -> vec4<f32> {
+  let x = f32(cell);
+  return vec4<f32>(
+    0.5 + 0.5 * sin(0.13 * x + 0.0),
+    0.5 + 0.5 * sin(0.17 * x + 2.0),
+    0.5 + 0.5 * sin(0.19 * x + 4.0),
+    1.0
+  );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -105,9 +118,14 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   var lightingTerm = min(ambientFactor + visibility * lambertTerm, 1.0);
 
   var meshCol = vec4<f32>(in.mesh_col, 1.0);
-  if (meshCol.r > 0.99 && meshCol.g > 0.99 && meshCol.b > 0.99){
-    meshCol = in.color;
+  var baseColor = in.color;
+  if (scene.debugCell > 0.99) {
+    baseColor = hash_color(in.cell);
   }
-  var albedo = in.color * 0.3 + meshCol * 0.7;
+
+  if (meshCol.r > 0.99 && meshCol.g > 0.99 && meshCol.b > 0.99){
+    meshCol = baseColor;
+  }
+  var albedo = baseColor * 0.3 + meshCol * 0.7;
   return albedo + lightingTerm * vec4<f32>(0.5);
 }

@@ -196,7 +196,8 @@ export class RenderBufferManager {
       3 * 4 +  // cameraPos
       1 * 4 +  // time
       1 * 4 +  // shadowOn
-      3 * 4 +  // padding
+      1 * 4 +  // debugCell
+      2 * 4 +  // padding
       0;
     
     this.sceneUBO = createUBO(this.device, sceneBufferSize);
@@ -400,6 +401,12 @@ export class RenderBufferManager {
             shaderLocation: 7,
             offset: cbm.agentRightOffset,
             format: 'float32x3'
+          },
+          {
+            // cell id
+            shaderLocation: 8,
+            offset: 19 * 4,
+            format: 'sint32'
           },
         ],
       },
@@ -643,7 +650,7 @@ export class RenderBufferManager {
     passEncoder.draw(sphereVertCount, numGoals, 0, 0);
   } 
 
-  updateSceneUBO(camera: Camera, gridOn: boolean, time: number, shadowOn: boolean){
+  updateSceneUBO(camera: Camera, gridOn: boolean, time: number, shadowOn: boolean, debugCell: boolean){
     mat4.multiply(this.cameraViewProjScratch, camera.projectionMatrix, camera.viewMatrix);
     this.sceneData.set(this.cameraViewProjScratch as Float32Array, 16);
     this.sceneData[35] = gridOn ? 1.0 : 0.0;
@@ -652,6 +659,7 @@ export class RenderBufferManager {
     this.sceneData[38] = camera.controls.eye[2];
     this.sceneData[39] = time;
     this.sceneData[40] = shadowOn ? 1.0 : 0.0;
+    this.sceneData[41] = debugCell ? 1.0 : 0.0;
     this.device.queue.writeBuffer(this.sceneUBO, 0, this.sceneData);
   }
 }

@@ -89,6 +89,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     model: 'Duck',
     showGoals: true,
     shadowOn: true,
+    debugCell: false,
     'total agents': "", // dummy, autofilled later
     '2^x agents': 10
   }
@@ -140,6 +141,10 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   simFolder.add(simulationParams, 'avoidanceModel');
   simFolder.add(simulationParams, 'resetSimulation');
   simFolder.open();
+
+  const debugFolder = gui.addFolder("Debug");
+  debugFolder.add(sceneParams, 'debugCell');
+  debugFolder.open();
 
   // manually set text for total number of agents 
   const totalAgentsDOM = gui.__folders["Scene"].__controllers[4].domElement;
@@ -512,7 +517,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     // ------------------ Render Calls ------------------------- //
     if (renderBuffManager != null) {
 
-      renderBuffManager.updateSceneUBO(camera, guiParams.gridOn, time, sceneParams.shadowOn);
+      renderBuffManager.updateSceneUBO(camera, guiParams.gridOn, time, sceneParams.shadowOn, sceneParams.debugCell);
       
       const agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents2Buffer : compBuffManager.agents1Buffer;
 

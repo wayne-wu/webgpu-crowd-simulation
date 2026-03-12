@@ -17,6 +17,7 @@ struct Scene {
     cameraPos : vec3<f32>,
     time : f32,
     shadowOn : f32,
+    debugCell : f32,
 }
 
 struct Model {
