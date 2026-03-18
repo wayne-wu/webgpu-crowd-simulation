@@ -264,7 +264,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   // GUI GLOBALS ------------------------------------------------------------
   // default don't display slider to select number of agents -- will re-add if scene requires
   let numAgentsSliderDisplayed = false;
+  let numAgentsController = null;
   let pendingSingleStep = false;
+  let lastConfiguredScene = sceneParams.scene;
 
 
   // GUI ELEMENTS -----------------------------------------------------------
@@ -552,28 +554,29 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   }
 
   function resetSim(){
+    const sceneChanged = sceneParams.scene !== lastConfiguredScene;
 
     switch(sceneParams.scene) {
       case TestScene.PROXIMAL:
-        setTestScene(vec3.fromValues(5, 10, 5), false, 6, 30, 0, true);
+        setTestScene(vec3.fromValues(5, 10, 5), false, 6, 30, 0, true, sceneChanged);
         break;
       case TestScene.BOTTLENECK:
-        setTestScene(vec3.fromValues(20, 20, 20), false, 9, 63, 2, true);
+        setTestScene(vec3.fromValues(20, 20, 20), false, 9, 63, 2, true, sceneChanged);
         break;
       case TestScene.DENSE:
-        setTestScene(vec3.fromValues(80, 75, 0), true, 15, 1000, 0, false);
+        setTestScene(vec3.fromValues(80, 75, 0), true, 15, 1000, 0, false, sceneChanged);
         break;
       case TestScene.SPARSE:
-        setTestScene(vec3.fromValues(50, 50, 50), true, 12, 100, 0, false);
+        setTestScene(vec3.fromValues(50, 50, 50), true, 12, 100, 0, false, sceneChanged);
         break;
       case TestScene.OBSTACLES:
-        setTestScene(vec3.fromValues(50, 50, 50), false, 10, 50, 5, true);
+        setTestScene(vec3.fromValues(50, 50, 50), false, 10, 50, 5, true, sceneChanged);
         break;
       case TestScene.CIRCLE:
-        setTestScene(vec3.fromValues(5, 20, 5), false, 6, 20, 0, true);
+        setTestScene(vec3.fromValues(5, 20, 5), false, 6, 20, 0, true, sceneChanged);
         break;
       case TestScene.DISPERSED:
-        setTestScene(vec3.fromValues(0, 60, 0), false, 11, 100, 0, false);
+        setTestScene(vec3.fromValues(0, 60, 0), false, 11, 100, 0, false, sceneChanged);
         break;
     }
 
@@ -596,25 +599,32 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     // the number of steps in the sort pipeline is proportional
     // to log2 the number of agents, so reinitiliaze it
     createComputePipelines();
+    lastConfiguredScene = sceneParams.scene;
   }
 
   function setTestScene(camPos: vec3, displayAgentSlider: boolean, numAgents: number, 
-                        scenePlatformWidth: number, numObstacles: number, shadowOn: boolean){
+                        scenePlatformWidth: number, numObstacles: number, shadowOn: boolean, sceneChanged: boolean){
     resetCameraFunc(camPos[0], camPos[1], camPos[2]); // set scene's camera position
-    compBuffManager.numValidAgents = 1<<numAgents;    // number of agents to use in simulation
-    sceneParams['2^x agents'] = numAgents;  // number of agents displayed in GUI
+    if (!displayAgentSlider || sceneChanged) {
+      sceneParams['2^x agents'] = numAgents;  // number of agents displayed in GUI
+    }
+    compBuffManager.numValidAgents = 1<<sceneParams['2^x agents'];    // number of agents to use in simulation
     platformWidth = scenePlatformWidth;               // size of the platform
     simulationParams.numObstacles = numObstacles;     // number of obstacles (used in compBufferManager, not gui)
     sceneParams.shadowOn = shadowOn;                      // display shadows on chosen scene
 
     // if agent slider exists and this scene doesn't support it, remove
     if (!displayAgentSlider && numAgentsSliderDisplayed) {
-      sceneFolder.remove(gui.__folders["Scene"].__controllers[5]);
+      sceneFolder.remove(numAgentsController);
+      numAgentsController = null;
       numAgentsSliderDisplayed = false;
     }
     // if agent slider is supported and it doesn't exist, add it
     else if (displayAgentSlider && !numAgentsSliderDisplayed) {
-      sceneFolder.add(sceneParams, '2^x agents', 1, 20, 1).listen();
+      numAgentsController = sceneFolder
+        .add(sceneParams, '2^x agents', 1, 20, 1)
+        .listen()
+        .onFinishChange(resetSim);
       numAgentsSliderDisplayed = true;
     }
     
