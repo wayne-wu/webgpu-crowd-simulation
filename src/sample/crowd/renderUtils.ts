@@ -46,6 +46,7 @@ export class RenderBufferManager {
   platformVertexBuffer    : GPUBuffer;
   obstacleVertexBuffer    : GPUBuffer;
   meshVertexBuffer        : GPUBuffer;
+  meshIndexBuffer         : GPUBuffer;
   goalVertBuffer          : GPUBuffer;
 
   platformPipeline        : GPURenderPipeline;
@@ -100,6 +101,7 @@ export class RenderBufferManager {
     this.platformVertexBuffer = createVBO(this.device, platformVertexArray);
     this.obstacleVertexBuffer = createVBO(this.device, cubeVertexArray);
     this.meshVertexBuffer = createVBO(this.device, this.mesh.vertexArray);
+    this.meshIndexBuffer = createIBO(this.device, this.mesh.indexArray);
     this.goalVertBuffer = createVBO(this.device, new Float32Array(sphereVertexArray));
   }
 
@@ -398,13 +400,13 @@ export class RenderBufferManager {
           },
           {
             // precomputed right vector (stored in xp)
-            shaderLocation: 7,
+            shaderLocation: 5,
             offset: cbm.agentRightOffset,
             format: 'float32x3'
           },
           {
             // cell id
-            shaderLocation: 8,
+            shaderLocation: 6,
             offset: 19 * 4,
             format: 'sint32'
           },
@@ -420,22 +422,10 @@ export class RenderBufferManager {
             format: 'float32x4',
           },
           {
-            // uv
-            shaderLocation: 4,
-            offset: this.mesh.uvOffset,
-            format: 'float32x2',
-          },
-          {
             // normal
-            shaderLocation: 5,
+            shaderLocation: 4,
             offset: this.mesh.normalOffset,
             format: 'float32x4'
-          },
-          {
-            // mesh color
-            shaderLocation: 6,
-            offset: this.mesh.colorOffset,
-            format: 'float32x3'
           }
           ],
       },   
@@ -614,14 +604,15 @@ export class RenderBufferManager {
     passEncoder.draw(platformVertexCount, 1, 0, 0);
   }
 
-  drawCrowdShadow(device: GPUDevice, renderCmd: GPUCommandEncoder, agentsBuffer: GPUBuffer, numAgents: number) {
-    const shadowPass = renderCmd.beginRenderPass(this.shadowPassDescriptor);
+  drawCrowdShadow(device: GPUDevice, renderCmd: GPUCommandEncoder, agentsBuffer: GPUBuffer, numAgents: number, passDescriptor: GPURenderPassDescriptor = this.shadowPassDescriptor) {
+    const shadowPass = renderCmd.beginRenderPass(passDescriptor);
     shadowPass.setPipeline(this.crowdShadowPipeline);
     shadowPass.setBindGroup(0, this.crowdShadowBindGroup);
     shadowPass.setBindGroup(1, this.crowdModelBindGroup);
     shadowPass.setVertexBuffer(0, agentsBuffer);
     shadowPass.setVertexBuffer(1, this.meshVertexBuffer);
-    shadowPass.draw(this.mesh.vertexCount, numAgents, 0, 0);
+    shadowPass.setIndexBuffer(this.meshIndexBuffer, 'uint32');
+    shadowPass.drawIndexed(this.mesh.indexCount, numAgents, 0, 0, 0);
     shadowPass.end();
   }
 
@@ -631,7 +622,8 @@ export class RenderBufferManager {
     passEncoder.setBindGroup(1, this.crowdModelBindGroup);
     passEncoder.setVertexBuffer(0, agentsBuffer);
     passEncoder.setVertexBuffer(1, this.meshVertexBuffer);
-    passEncoder.draw(this.mesh.vertexCount, numAgents, 0, 0);
+    passEncoder.setIndexBuffer(this.meshIndexBuffer, 'uint32');
+    passEncoder.drawIndexed(this.mesh.indexCount, numAgents, 0, 0, 0);
   }
   
   drawObstacles(device: GPUDevice, passEncoder: GPURenderPassEncoder, obstaclesBuffer: GPUBuffer, numObstacles: number) {
@@ -678,6 +670,17 @@ const createVBO = (device: GPUDevice, vertexArray: Float32Array) => {
   new Float32Array(vertexBuffer.getMappedRange()).set(vertexArray);
   vertexBuffer.unmap();
   return vertexBuffer;
+}
+
+const createIBO = (device: GPUDevice, indexArray: Uint32Array) => {
+  const indexBuffer = device.createBuffer({
+      size: indexArray.byteLength,
+      usage: GPUBufferUsage.INDEX,
+      mappedAtCreation: true,
+  });
+  new Uint32Array(indexBuffer.getMappedRange()).set(indexArray);
+  indexBuffer.unmap();
+  return indexBuffer;
 }
 
 const createUBO = (device: GPUDevice, size: number) => {

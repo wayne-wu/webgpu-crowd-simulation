@@ -162,6 +162,29 @@ Since our test scenes vary from small/proximal to large/far, and agents' traject
 |Obstacles	|23	|33|
 |Circle	|177	|190|
 
+## Optimization
+To better understand where frame time was being spent, we added GPU timestamp-query profiling around the main compute pass, the shadow pass, and the main render pass. An example capture with shadows disabled showed:
+
+```text
+computeMs: 4.17
+renderMs: 41.60
+shadowMs: 0.09
+```
+
+This quickly narrowed the bottleneck down to the main crowd render path rather than the compute shaders. From there, we applied a sequence of rendering-focused optimizations and measured the results using the same profiler.
+
+| Change | What we changed | Main effect | Approx. render time impact |
+| --- | --- | --- | --- |
+| Baseline profiling | Added GPU timestamp queries for `compute`, `shadow`, and `render` passes | Identified that rendering, not compute, was the bottleneck | Baseline: `renderMs ~= 41.6` |
+| Skip crowd draw | Temporarily disabled `drawCrowd()` | Confirmed the crowd render path dominated the main render pass | Render dropped significantly |
+| Indexed crowd meshes | Preserved index buffers in the mesh loader and switched the crowd passes to `drawIndexed()` | Removed heavy vertex duplication and improved vertex reuse | `41.6 -> 22.0 ms` |
+| Remove unused UV | Removed `mesh_uv` from the crowd shader and pipeline layout | Reduced per-vertex fetch and interpolant bandwidth across all instances | `22.0 -> 18.0 ms` |
+| Direct basis-vector math | Replaced per-vertex matrix construction in the crowd vertex shader with direct basis-vector transforms | Little measurable improvement; likely not the active bottleneck | `18.0 -> 17.94 ms` |
+| Remove mesh color | Removed `mesh_col` from the main crowd render path | Small additional per-vertex bandwidth reduction | `17.94 -> 17.71 ms` |
+| Cube mesh sanity check | Switched to the cube model | Showed that remaining render cost was dominated by mesh complexity | `17.71 -> 0.36 ms` |
+
+The biggest wins came from reducing geometry and vertex bandwidth rather than reducing compute shader work. After the low-hanging rendering cleanup, the remaining bottleneck was primarily mesh complexity, which suggests that future work should focus on lower-poly assets, level-of-detail, or impostor-style rendering for large crowds.
+
 # Additional Test Scenes
 
 Circle            | Dispersed                      

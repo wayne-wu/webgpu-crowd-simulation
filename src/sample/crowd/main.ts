@@ -23,6 +23,155 @@ import { render } from 'react-dom';
 let camera : Camera;
 let aspect : number;
 
+const gpuProfilerPasses = [
+  'compute',
+  'shadow',
+  'render',
+] as const;
+
+type GpuProfilerPassName = typeof gpuProfilerPasses[number];
+
+type GpuProfiler = {
+  supported: boolean,
+  active: boolean,
+  querySet: GPUQuerySet | null,
+  resolveBuffer: GPUBuffer | null,
+  readbackBuffer: GPUBuffer | null,
+  sampleCount: number,
+  frameInterval: number,
+  framesUntilReadback: number,
+  readbackPending: boolean,
+  capturePending: boolean,
+  totalsMs: Record<GpuProfilerPassName, number>,
+  samplesAccumulated: number,
+};
+
+function createGpuProfiler(device: GPUDevice, enableTimestamps: boolean): GpuProfiler {
+  if (!enableTimestamps) {
+    return {
+      supported: false,
+      active: false,
+      querySet: null,
+      resolveBuffer: null,
+      readbackBuffer: null,
+      sampleCount: 0,
+      frameInterval: 30,
+      framesUntilReadback: 30,
+      readbackPending: false,
+      capturePending: false,
+      totalsMs: { compute: 0, shadow: 0, render: 0 },
+      samplesAccumulated: 0,
+    };
+  }
+
+  const sampleCount = gpuProfilerPasses.length * 2;
+  const bufferSize = sampleCount * BigUint64Array.BYTES_PER_ELEMENT;
+
+  return {
+    supported: true,
+    active: false,
+    querySet: device.createQuerySet({
+      type: 'timestamp',
+      count: sampleCount,
+    }),
+    resolveBuffer: device.createBuffer({
+      size: bufferSize,
+      usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+    }),
+    readbackBuffer: device.createBuffer({
+      size: bufferSize,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    }),
+    sampleCount,
+    frameInterval: 30,
+    framesUntilReadback: 30,
+    readbackPending: false,
+    capturePending: false,
+    totalsMs: { compute: 0, shadow: 0, render: 0 },
+    samplesAccumulated: 0,
+  };
+}
+
+function getTimestampWrites(profiler: GpuProfiler, passIndex: number) {
+  if (!profiler.active || profiler.querySet == null) {
+    return undefined;
+  }
+
+  return {
+    querySet: profiler.querySet,
+    beginningOfPassWriteIndex: passIndex * 2,
+    endOfPassWriteIndex: passIndex * 2 + 1,
+  };
+}
+
+function scheduleGpuProfilerReadback(device: GPUDevice, profiler: GpuProfiler) {
+  if (!profiler.active || profiler.readbackPending || profiler.readbackBuffer == null) {
+    return;
+  }
+  profiler.readbackPending = true;
+  profiler.capturePending = false;
+
+  device.queue.onSubmittedWorkDone().then(async () => {
+    if (profiler.readbackBuffer == null) {
+      profiler.readbackPending = false;
+      return;
+    }
+
+    try {
+      await profiler.readbackBuffer.mapAsync(GPUMapMode.READ);
+      const mapped = profiler.readbackBuffer.getMappedRange();
+      const timestamps = new BigUint64Array(mapped.slice(0));
+      profiler.readbackBuffer.unmap();
+
+      for (let i = 0; i < gpuProfilerPasses.length; i++) {
+        const passName = gpuProfilerPasses[i];
+        const begin = timestamps[i * 2];
+        const end = timestamps[i * 2 + 1];
+        profiler.totalsMs[passName] += Number(end - begin) / 1e6;
+      }
+
+      profiler.samplesAccumulated++;
+      if (profiler.samplesAccumulated >= 10) {
+        console.log('[gpu profiler]', {
+          computeMs: profiler.totalsMs.compute / profiler.samplesAccumulated,
+          shadowMs: profiler.totalsMs.shadow / profiler.samplesAccumulated,
+          renderMs: profiler.totalsMs.render / profiler.samplesAccumulated,
+        });
+        profiler.totalsMs = { compute: 0, shadow: 0, render: 0 };
+        profiler.samplesAccumulated = 0;
+      }
+    } catch (error) {
+      console.warn('GPU profiler readback failed.', error);
+      profiler.active = false;
+    } finally {
+      profiler.readbackPending = false;
+    }
+  });
+}
+
+function updateGpuProfilerCaptureState(profiler: GpuProfiler) {
+  if (!profiler.active || profiler.readbackPending || profiler.capturePending) {
+    return false;
+  }
+
+  profiler.framesUntilReadback--;
+  if (profiler.framesUntilReadback > 0) {
+    return false;
+  }
+
+  profiler.framesUntilReadback = profiler.frameInterval;
+  profiler.capturePending = true;
+  return true;
+}
+
+function setGpuProfilerActive(profiler: GpuProfiler, active: boolean) {
+  profiler.active = profiler.supported && active;
+  profiler.framesUntilReadback = profiler.frameInterval;
+  profiler.capturePending = false;
+  profiler.totalsMs = { compute: 0, shadow: 0, render: 0 };
+  profiler.samplesAccumulated = 0;
+}
+
 // Reset camera to original settings (gui function)
 function resetCameraFunc(x: number = 50, y: number = 50, z: number = 50) {
   camera = new Camera(vec3.fromValues(x, y, z), vec3.fromValues(0, 0, 0));
@@ -90,6 +239,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     showGoals: true,
     shadowOn: true,
     debugCell: false,
+    gpuProfiling: false,
     'total agents': "", // dummy, autofilled later
     '2^x agents': 10
   }
@@ -177,7 +327,37 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
   /////////////////////////////////////////////////////////////////////////
 
   const adapter = await navigator.gpu.requestAdapter();
-  const device = await adapter.requestDevice();
+  if (adapter == null) {
+    throw new Error('Failed to acquire a WebGPU adapter.');
+  }
+
+  const requiredFeatures : GPUFeatureName[] = [];
+  const adapterFeatures = adapter.features as unknown as Set<GPUFeatureName>;
+  const hasTimestampQuery = adapterFeatures.has('timestamp-query');
+  if (hasTimestampQuery) {
+    requiredFeatures.push('timestamp-query');
+  } else {
+    console.info('GPU timestamp queries are unavailable on this adapter/browser.');
+  }
+
+  const device = await adapter.requestDevice({
+    requiredFeatures,
+  });
+  const gpuProfiler = createGpuProfiler(device, hasTimestampQuery);
+  if (!gpuProfiler.supported) {
+    sceneParams.gpuProfiling = false;
+  }
+
+  const gpuProfilingController = debugFolder.add(sceneParams, 'gpuProfiling');
+  gpuProfilingController.name('gpuProfiling');
+  if (!gpuProfiler.supported) {
+    const style = gpuProfilingController.domElement.style;
+    style.pointerEvents = 'none';
+    style.opacity = '0.5';
+  }
+  gpuProfilingController.onChange((enabled: boolean) => {
+    setGpuProfilerActive(gpuProfiler, enabled);
+  });
 
   if (canvasRef.current === null) return;
   const context = canvasRef.current.getContext('webgpu');
@@ -353,7 +533,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
     renderBuffManager = null;
     if (sceneParams.model == 'Cube'){
-      const mesh = new Mesh(Array.from(cubeVertexArray), cubeVertexCount);
+      const mesh = new Mesh(cubeVertexArray);
       mesh.scale = 0.2;
       renderBuffManager = new RenderBufferManager(device, guiParams.gridWidth, 
         presentationFormat, presentationSize,
@@ -468,6 +648,7 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
     if (!canvasRef.current) return;
 
     camera.update();
+    const captureGpuProfile = updateGpuProfilerCaptureState(gpuProfiler);
 
     //------------------ Compute Calls ------------------------ //
     {
@@ -481,7 +662,9 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
 
         // execute each compute shader in the order they were pushed onto
         // the computePipelines array
-        var passEncoder = command.beginComputePass();
+        var passEncoder = command.beginComputePass({
+          timestampWrites: getTimestampWrites(gpuProfiler, 0),
+        } as unknown as GPUComputePassDescriptor);
         passEncoder.setBindGroup(0, computeBindGroup);
 
         //// ----- Compute Pass Before Sort -----
@@ -544,15 +727,24 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       
       const agentsBuffer : GPUBuffer = computeBindGroup == computeBindGroup2 ? compBuffManager.agents2Buffer : compBuffManager.agents1Buffer;
 
-      if(sceneParams.shadowOn)
-        renderBuffManager.drawCrowdShadow(device, command, agentsBuffer, compBuffManager.numAgents);
+      if(sceneParams.shadowOn) {
+        const shadowPassDescriptor = {
+          ...renderBuffManager.shadowPassDescriptor,
+          timestampWrites: getTimestampWrites(gpuProfiler, 1),
+        } as unknown as GPURenderPassDescriptor;
+        renderBuffManager.drawCrowdShadow(device, command, agentsBuffer, compBuffManager.numAgents, shadowPassDescriptor);
+      }
 
       // const transformationMatrix = getTransformationMatrix();
       renderBuffManager.renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
       
-      const renderPass = command.beginRenderPass(renderBuffManager.renderPassDescriptor);
+      const renderPassDescriptor = {
+        ...renderBuffManager.renderPassDescriptor,
+        timestampWrites: getTimestampWrites(gpuProfiler, 2),
+      } as unknown as GPURenderPassDescriptor;
+      const renderPass = command.beginRenderPass(renderPassDescriptor);
 
       // ----------------------- Draw ------------------------- //
       renderBuffManager.drawPlatform(device, renderPass, platformWidth);
@@ -569,7 +761,22 @@ const init: SampleInit = async ({ canvasRef, gui, stats }) => {
       renderPass.end();
     }
 
+    if (captureGpuProfile && gpuProfiler.querySet != null && gpuProfiler.resolveBuffer != null && gpuProfiler.readbackBuffer != null) {
+      const bytesPerTimestamp = BigUint64Array.BYTES_PER_ELEMENT;
+      command.resolveQuerySet(gpuProfiler.querySet, 0, gpuProfiler.sampleCount, gpuProfiler.resolveBuffer, 0);
+      command.copyBufferToBuffer(
+        gpuProfiler.resolveBuffer,
+        0,
+        gpuProfiler.readbackBuffer,
+        0,
+        gpuProfiler.sampleCount * bytesPerTimestamp
+      );
+    }
+
     device.queue.submit([command.finish()]);
+    if (captureGpuProfile) {
+      scheduleGpuProfilerReadback(device, gpuProfiler);
+    }
 
     requestAnimationFrame(frame);
     stats.end();

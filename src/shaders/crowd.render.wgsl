@@ -10,56 +10,39 @@ struct VertexInput {
   @location(1) color    : vec4<f32>,  // agent color
   @location(2) velocity : vec3<f32>,  // agent velocity
   @location(3) mesh_pos : vec4<f32>,  // mesh vertex position (model space)
-  @location(4) mesh_uv  : vec2<f32>,  // mesh vertex uv
-  @location(5) mesh_nor : vec4<f32>,  // mesh vertex normal
-  @location(6) mesh_col : vec3<f32>,  // mesh vertex color
-  @location(7) right    : vec3<f32>,  // agent right dir
-  @location(8) cell     : i32,        // agent spatial hash cell
+  @location(4) mesh_nor : vec4<f32>,  // mesh vertex normal
+  @location(5) right    : vec3<f32>,  // agent right dir
+  @location(6) cell     : i32,        // agent spatial hash cell
 }
 
 struct VertexOutput {
   @builtin(position) position : vec4<f32>,
   @location(0)       color    : vec4<f32>,
   @location(1)       mesh_pos : vec4<f32>,
-  @location(2)       mesh_uv  : vec2<f32>,
-  @location(3)       mesh_nor : vec4<f32>,
-  @location(4)       mesh_col : vec3<f32>,
-  @location(5)       shadowPos : vec3<f32>,
-  @location(6) @interpolate(flat) cell : i32,
+  @location(2)       mesh_nor : vec4<f32>,
+  @location(3)       shadowPos : vec3<f32>,
+  @location(4) @interpolate(flat) cell : i32,
 }
 
 @vertex
 fn vs_main(in : VertexInput) -> VertexOutput {
-
-  var instance = mat4x4<f32>();
-  var scale = mat4x4<f32>();
-  scale[0] = vec4<f32>(1.0, 0.0, 0.0, 0.0);
-  scale[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
-  scale[2] = vec4<f32>(0.0, 0.0, 1.0, 0.0);
-  scale[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
-
-  var rot = mat4x4<f32>();
-  rot[0] = vec4<f32>(in.right, 0.0);
-  rot[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
-  rot[2] = vec4<f32>(in.velocity, 0.0);
-  rot[3] = vec4<f32>(0.0, 0.0, 0.0, 1.0);
-
-  var trans = mat4x4<f32>();
-  trans[0] = vec4<f32>(1.0, 0.0, 0.0, 0.0);
-  trans[1] = vec4<f32>(0.0, 1.0, 0.0, 0.0);
-  trans[2] = vec4<f32>(0.0, 0.0, 1.0, 0.0);
-  trans[3] = vec4<f32>(in.position, 1.0);
-
-  instance = trans * rot * scale;
+  let modelPos = model.modelMatrix * in.mesh_pos;
+  let modelNor = model.modelMatrix * in.mesh_nor;
+  let up = vec3<f32>(0.0, 1.0, 0.0);
+  let worldPos = in.position +
+    modelPos.x * in.right +
+    modelPos.y * up +
+    modelPos.z * in.velocity;
+  let worldNor = modelNor.x * in.right +
+    modelNor.y * up +
+    modelNor.z * in.velocity;
 
   var out : VertexOutput;
-  out.mesh_pos = instance * model.modelMatrix * in.mesh_pos;
+  out.mesh_pos = vec4<f32>(worldPos, modelPos.w);
   out.position = scene.cameraViewProjMatrix * out.mesh_pos;
   out.color = in.color;
-  out.mesh_uv = in.mesh_uv;
 
-  out.mesh_nor = instance * model.modelMatrix * in.mesh_nor;
-  out.mesh_col = in.mesh_col;
+  out.mesh_nor = vec4<f32>(worldNor, modelNor.w);
   out.cell = in.cell;
 
   if(scene.shadowOn > 0.99) {
@@ -117,15 +100,11 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   var lambertTerm = max(dot(lightDir, normalize(in.mesh_nor.xyz)), 0.0);
   var lightingTerm = min(ambientFactor + visibility * lambertTerm, 1.0);
 
-  var meshCol = vec4<f32>(in.mesh_col, 1.0);
   var baseColor = in.color;
   if (scene.debugCell > 0.99) {
     baseColor = hash_color(in.cell);
   }
 
-  if (meshCol.r > 0.99 && meshCol.g > 0.99 && meshCol.b > 0.99){
-    meshCol = baseColor;
-  }
-  var albedo = baseColor * 0.3 + meshCol * 0.7;
+  var albedo = baseColor;
   return albedo + lightingTerm * vec4<f32>(0.5);
 }

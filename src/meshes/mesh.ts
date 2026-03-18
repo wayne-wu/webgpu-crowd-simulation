@@ -3,7 +3,9 @@ import {GLTFLoader} from '../../node_modules/three/examples/jsm/loaders/GLTFLoad
 
 export class Mesh {
     vertexArray     : Float32Array;
+    indexArray      : Uint32Array;
     vertexCount     : number;
+    indexCount      : number;
     itemSize        : number;
     posOffset       : number;
     uvOffset        : number;
@@ -12,9 +14,13 @@ export class Mesh {
     scale           : number;
     rotation        : mat4;
 
-    constructor(array : Array<number>, count : number){
-        this.vertexArray = new Float32Array(array);
-        this.vertexCount = count;
+    constructor(vertexArray : Array<number> | Float32Array, indexArray? : Array<number> | Uint32Array){
+        this.vertexArray = vertexArray instanceof Float32Array ? vertexArray : new Float32Array(vertexArray);
+        this.vertexCount = this.vertexArray.length / 13;
+        const defaultIndices = Array.from({ length: this.vertexCount }, (_, i) => i);
+        const indices = indexArray == null ? defaultIndices : indexArray;
+        this.indexArray = indices instanceof Uint32Array ? indices : new Uint32Array(indices);
+        this.indexCount = this.indexArray.length;
         this.itemSize = 4 * 4 + // position vec4
                         2 * 4 + // uv vec2
                         4 * 4 + // normal vec4
@@ -30,45 +36,50 @@ export class Mesh {
 
 export function loadModel(gltfPath : string, device: GPUDevice) {
     const tmpMeshVertexArray = [];
+    const tmpMeshIndexArray = [];
 
     const promise = new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
 
         loader.load( gltfPath, ( gltf ) => {
-            let vertCount = 0;
             let vertArrayIdx = 0;
+            let vertexOffset = 0;
 
             // extract vertices and save to Float32Array
             gltf.scene.traverse( ( child ) => {
                 if ( child.isMesh ) {
-                    vertCount = vertCount + child.geometry.index.count;
                     const gltfArray = child.geometry.attributes.position.array;
                     const gltfUVArray = child.geometry.attributes.uv.array;
                     const gltfNormalArray = child.geometry.attributes.normal.array;
                     const gltfIdxArray = child.geometry.index.array;
                     const color = child.material.color;
 
-                    for (let i = 0; i < gltfIdxArray.length; i++){
-                        const idx = gltfIdxArray[i];
-                        tmpMeshVertexArray[vertArrayIdx+0] = gltfArray[idx * 3 + 0];        // position.x
-                        tmpMeshVertexArray[vertArrayIdx+1] = gltfArray[idx * 3 + 1];        // position.y
-                        tmpMeshVertexArray[vertArrayIdx+2] = gltfArray[idx * 3 + 2];        // position.z
+                    const vertexCount = child.geometry.attributes.position.count;
+                    for (let i = 0; i < vertexCount; i++){
+                        tmpMeshVertexArray[vertArrayIdx+0] = gltfArray[i * 3 + 0];         // position.x
+                        tmpMeshVertexArray[vertArrayIdx+1] = gltfArray[i * 3 + 1];         // position.y
+                        tmpMeshVertexArray[vertArrayIdx+2] = gltfArray[i * 3 + 2];         // position.z
                         tmpMeshVertexArray[vertArrayIdx+3] = 1;                             // position.w
-                        tmpMeshVertexArray[vertArrayIdx+4] = gltfUVArray[idx * 2 + 0];      // uv.u
-                        tmpMeshVertexArray[vertArrayIdx+5] = gltfUVArray[idx * 2 + 1];      // uv.v
-                        tmpMeshVertexArray[vertArrayIdx+6] = gltfNormalArray[idx * 3 + 0];  // normal.x
-                        tmpMeshVertexArray[vertArrayIdx+7] = gltfNormalArray[idx * 3 + 1];  // normal.y
-                        tmpMeshVertexArray[vertArrayIdx+8] = gltfNormalArray[idx * 3 + 2];  // normal.z
+                        tmpMeshVertexArray[vertArrayIdx+4] = gltfUVArray[i * 2 + 0];       // uv.u
+                        tmpMeshVertexArray[vertArrayIdx+5] = gltfUVArray[i * 2 + 1];       // uv.v
+                        tmpMeshVertexArray[vertArrayIdx+6] = gltfNormalArray[i * 3 + 0];   // normal.x
+                        tmpMeshVertexArray[vertArrayIdx+7] = gltfNormalArray[i * 3 + 1];   // normal.y
+                        tmpMeshVertexArray[vertArrayIdx+8] = gltfNormalArray[i * 3 + 2];   // normal.z
                         tmpMeshVertexArray[vertArrayIdx+9] = 0;                             // normal.w
-                        tmpMeshVertexArray[vertArrayIdx+10] = color.r;                     // color.r
-                        tmpMeshVertexArray[vertArrayIdx+11] = color.g;                     // color.g
-                        tmpMeshVertexArray[vertArrayIdx+12] = color.b;                     // color.b
-
+                        tmpMeshVertexArray[vertArrayIdx+10] = color.r;                      // color.r
+                        tmpMeshVertexArray[vertArrayIdx+11] = color.g;                      // color.g
+                        tmpMeshVertexArray[vertArrayIdx+12] = color.b;                      // color.b
                         vertArrayIdx += 13;
                     }
+
+                    for (let i = 0; i < gltfIdxArray.length; i++){
+                        tmpMeshIndexArray.push(vertexOffset + gltfIdxArray[i]);
+                    }
+
+                    vertexOffset += vertexCount;
                 }
             })
-            const mesh = new Mesh(tmpMeshVertexArray, vertCount);
+            const mesh = new Mesh(tmpMeshVertexArray, tmpMeshIndexArray);
             resolve(mesh);
         });
     })
